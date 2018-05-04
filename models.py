@@ -1,5 +1,5 @@
 import tensorflow as tf;
-import time;
+
 
 class Model:
     """
@@ -165,6 +165,52 @@ class Autoencoder(Model):
         self.out_biases.append(b_out);
         self.out_biases_fixed.append(b_out_fixed);
 
+    def clone_weights(self, a):
+
+        # copy weights
+        for w in a.weights:
+            _w = tf.Variable(w);
+            self.weights.append(_w);
+            self.fixed_weights(tf.Variable(tf.identity(_w)))
+
+        # copy biases
+        for b in a.biases:
+            _b = tf.Variable(b);
+            self.biases.append(_b);_
+            self.fixed_biases.append(tf.Variable(tf.identity(_b)));
+
+        # copy output biases
+        for b_out in a.out_biases:
+            _b_out = tf.Variable(b_out);
+            self.out_biases.append(_b_out);
+            self.out_biases_fixed.append(tf.Variable(tf.identity(_b_out)))
+
+
+
+
+    @classmethod
+    def clone(cls, src):
+        """
+        Copy constructor
+        :param a:
+        :param autoencoder:
+        """
+        a = cls(src.input_count, src.layer_counts, src.loss)
+        a.clone_weights(src)
+        a.__session = src.session;
+        a.session.run(variables_initializer(a.weights + a.biases + a.fixed_biases))
+
+    @classmethod
+    def build(cls, input_count, layer_counts, loss):
+        a = cls(input_count, layer_counts, loss);
+        a.prepare_session();
+        for i in range(0, l - 1):
+            a.create_weights(layer_counts[i], layer_counts[i + 1]);
+
+        init = tf.global_variables_initializer();
+        a.session.run(init);
+        return a;
+
     def __init__(self, input_count, layer_counts, loss):
         """
         Main class constructor
@@ -183,7 +229,7 @@ class Autoencoder(Model):
         self.loss = loss;
         self.input_count = input_count;
         self.layer_counts = layer_counts;
-        self.weights = [];   
+        self.weights = [];
         self.biases = [];
         self.out_biases = [];
         self.out_biases_fixed = [];
@@ -191,14 +237,8 @@ class Autoencoder(Model):
         self.fixed_weights = [];
         self.fixed_biases = []
         l = len(layer_counts);
-        self.prepare_session();
-        self.create_weights(input_count, layer_counts[0]);
-        # add encoding layers
-        for i in range(0, l - 1):
-            self.create_weights(layer_counts[i], layer_counts[i + 1]);
-        
-        init = tf.global_variables_initializer();
-        self.session.run(init);
+        self.__session = None
+
 
     def get_variables_to_init(self, n):
         """
