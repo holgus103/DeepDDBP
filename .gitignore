@@ -1,0 +1,11 @@
+/DDBP/graphs/
+/DDBP/summaries/
+/DDBP/models/
+/DDBP/states
+/DDBP/run/models/
+/DDBP/run/summaries/
+
+*.suo
+*.pyc
+*.htm
+*.zip

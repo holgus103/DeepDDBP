@@ -1,0 +1,3 @@
+import Tests;
+
+Tests.fulltest();
