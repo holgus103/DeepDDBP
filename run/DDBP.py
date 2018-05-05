@@ -62,10 +62,9 @@ a = models.Autoencoder.build(208, [52, 13], models.Model.cross_entropy_loss);
 
 # pretrain each layer
 a.pretrain(0.001, 0, 1000, data_batches, 0, 1, path + "{0}" , optimizer, 0.2, 15);
-a.pretrain(0.001, 1, 1000, data_batches, 0, 1, path + "{0}" , optimizer, 0.2, 15);
 
 # create classifier
-c = models.Classifier(a, 14);
+c = models.Classifier(a, 2);
 # train whole network
 c.train(data_batches, outputs_batches, 0.0001, 15000, 0.1, path +"/finetuning", data, outputs, test_data, test_outputs, dp.suit_count_for_params(TRAIN_NO_TRUMP, TRAIN_TRUMP), dp.suit_count_for_params(TEST_NO_TRUMP, TEST_TRUMP), models.Model.mse_loss, 25, experiment_name);
 

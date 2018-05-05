@@ -1,5 +1,5 @@
 import tensorflow as tf;
-
+import numpy as np;
 
 class Model:
     """
@@ -90,7 +90,6 @@ class Autoencoder(Model):
     """
     Class implementing a multilayered Autoencoder Network
     Reference: https://github.com/aymericdamien/TensorFlow-Examples/blob/master/examples/3_NeuralNetworks/autoencoder.py
-
     """
 
 
@@ -198,7 +197,8 @@ class Autoencoder(Model):
         a = cls(src.input_count, src.layer_counts, src.loss)
         a.clone_weights(src)
         a.__session = src.session;
-        a.session.run(variables_initializer(a.weights + a.biases + a.fixed_biases))
+        a.session.run(tf.variables_initializer(a.weights + a.biases + a.fixed_biases))
+        return a;
 
     @classmethod
     def build(cls, input_count, layer_counts, loss):
@@ -436,14 +436,13 @@ class Autoencoder(Model):
             layers.append(inp);
         return layers;
 
-
-
-
 class Classifier(Model):
     """
     Class used to append a classifier to a pretrained autoencoder
 
     """
+    autoencoder_r: Autoencoder
+    autoencoder_l: Autoencoder
 
     def __init__(self, autoencoder, outputs):
         """
@@ -456,10 +455,22 @@ class Classifier(Model):
             The autoencoder object to which the classifier will be appended to
 
         """
-        self.autoencoder = autoencoder;
-        self.input_placeholder = tf.placeholder("float", [None, self.autoencoder.input_count]);
-        self.encoder = autoencoder.build_complete_net(self.input_placeholder);
-        input = self.encoder[len(self.encoder) - 1];
+        # store encoders
+        self.autoencoder_l = autoencoder;
+        self.autoencoder_r = Autoencoder.clone(autoencoder);
+        # initialize placeholders
+        self.input_placeholder_l = tf.placeholder("float", [None, self.autoencoder_l.input_count]);
+        self.input_placeholder_r = tf.placeholder("float", [None, self.autoencoder_r.input_count]);
+        # build final encoding layers
+        self.encoder_l = self.autoencoder_l.build_complete_net(self.input_placeholder_l);
+        self.encoder_r - self.autoencoder_r.build_complete_net(self.input_placeholder_r);
+
+        input_l = self.encoder_l[len(self.encoder_l) - 1];
+        input_r = self.encoder_r[len(self.encoder_r) - 1];
+
+        input = tf.concat([input_l, input_r], 1)
+        self.session = autoencoder.session;
+
         self.weights = tf.Variable(tf.random_normal([input.shape[1].value, outputs]));
         self.biases = tf.Variable(tf.random_normal([outputs]));
         self.layer = tf.nn.softmax(tf.matmul(input, self.weights) + self.biases);
@@ -497,7 +508,7 @@ class Classifier(Model):
         add_suit_values_for_set(s, "Test", suits_test, test_suits);
         return s;
 
-    def train(self, data, desired_output, learning_rate, it, delta, path, train_data, train_output, test_data, test_output, train_suits = 5, test_suits = 5, loss_f = Model.mse_loss, no_improvement = 5, experiment_name = ""):
+    def train(self, data, learning_rate, it, delta, path, train_data, train_output, test_data, test_output, train_suits = 5, test_suits = 5, loss_f = Model.mse_loss, no_improvement = 5, experiment_name = ""):
         """
         Main train method
     
@@ -528,19 +539,26 @@ class Classifier(Model):
             If the error function value worsens the amount of times specified by this parameter the calculation will be aborted
             
         """
-        loss = loss_f(self.output_placeholder, self.layer); 
+        loss = loss_f(self.output_placeholder, self.layer);
         opt = tf.train.RMSPropOptimizer(learning_rate);
         optimizer = opt.minimize(loss);
-        self.autoencoder.session.run(tf.variables_initializer([self.weights, self.biases]));
-        slot_vars = [self.weights, self.biases] + self.autoencoder.biases + self.autoencoder.weights;
-        self.autoencoder.session.run(Model.initialize_optimizer(opt, slot_vars));
-        hist_summaries = [(self.autoencoder.weights[i], 'weights{0}'.format(i)) for i in range(0, len(self.autoencoder.weights))];
-        hist_summaries.extend([(self.autoencoder.biases[i], 'biases{0}'.format(i)) for i in range(0, len(self.autoencoder.weights))]);
+        self.autoencoder_l.session.run(tf.variables_initializer([self.weights, self.biases]));
+        self.autoencoder_l.session.run(tf.variables_initializer())
+        slot_vars = [self.weights, self.biases] + self.autoencoder_l.biases + self.autoencoder_l.weights;
+        self.autoencoder_l.session.run(Model.initialize_optimizer(opt, slot_vars));
+        hist_summaries = [(self.autoencoder_l.weights[i], 'weights{0}'.format(i)) for i in range(0, len(self.autoencoder_l.weights))];
+        hist_summaries.extend([(self.autoencoder_l.biases[i], 'biases{0}'.format(i)) for i in range(0, len(self.autoencoder_l.weights))]);
         summaries = [tf.summary.histogram(v[1], v[0]) for v in hist_summaries];
-        summaries.append(tf.summary.scalar("loss_4", loss));   
+        summaries.append(tf.summary.scalar("loss_final", loss));
         summary_op = tf.summary.merge(summaries);
 
-        writer = tf.summary.FileWriter(path, graph=self.autoencoder.session.graph)
+        writer = tf.summary.FileWriter(path, graph=self.autoencoder_l.session.graph)
+
+        available_keys = [];
+        # find available keys
+        for i in range(0, 14):
+            if i in data and len(data[i]) > 0:
+                available_keys.append(i);
 
         if delta > 0:
             prev_val = 0;
@@ -548,19 +566,50 @@ class Classifier(Model):
             no_improvement_counter = 0;
             it_counter = 0;
             while True:
-                for k in range(0, len(data)):
-                    lval, _, summary = self.autoencoder.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder: data[k], self.output_placeholder: desired_output[k]});
+                # for every key
+                epoch_error = 0;
+                epoch_count = 0;
+                for index in range(0, len(available_keys)):
+                    for inner in range(index + 1, len(available_keys)):
+                        data_left = data[available_keys[index]];
+                        data_right = data[available_keys[inner]];
+                        for entry_l in data_left:
+                            for entry_r in data_right:
+                                err = 0;
+                                lval, _ = self.session.run([loss, optimizer], \
+                                                           feed_dict={self.input_placeholder_l: entry_l, \
+                                                                      self.input_placeholder_r: entry_r, \
+                                                                      self.output_placeholder: [np.array([0, 1])]});
+                                err += lval;
+
+                                lval, _ = self.session.run([loss, optimizer], \
+                                                           feed_dict={self.input_placeholder_r: entry_l, \
+                                                                      self.input_placeholder_r: entry_r, \
+                                                                      self.output_placeholder: [np.array([1, 0])]});
+                                err += lval;
+                                epoch_error += err;
+                                epoch_count += 2;
+                # calculate average error
+                lval = float(epoch_count) / float(epoch_count);
+                # every 100 iterations show results log summaries
                 if it_counter % 100 == 0:
                     s = self.create_train_summary(train_data, train_output, test_data, test_output, train_suits, test_suits);
                     current_val = self.test(test_data, test_output)[0];
                     print(current_val);
-                    self.save_model(experiment_name + " at {0}".format(it_counter))
+                    # save model
+
+                    if it_counter % 1000 == 0:
+                        self.save_model(experiment_name + " at {0}".format(it_counter))
+
                     print("finetuning - it {0} - lval {1}".format(it_counter, lval));
+                    # create error summary
+                    summary = tf.Summary();
+                    summary.value.add(tag="loss_finetuning", simple_value=lval)
                     writer.add_summary(summary, it_counter);
                     writer.add_summary(s, it_counter);
                     if prev_val != 0 and (current_val - prev_val) < delta:
                         print(current_val - prev_val);
-                        if(no_improvement_counter > no_improvement):
+                        if no_improvement_counter > no_improvement:
                             print("terminating due to no improvement");
                             print("finetuning - it {0} - lval {1}".format(it_counter, lval));
                             return
@@ -572,7 +621,7 @@ class Classifier(Model):
         else:
             for i in range(0, it):
                 for k in range(0, len(data)):
-                    lval, _, summary = self.autoencoder.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder: data[k], self.output_placeholder: desired_output[k]});
+                    lval, _, summary = self.autoencoder_l.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder: data[k], self.output_placeholder: desired_output[k]});
                 if i % 100 == 0:
                     print("finetuning - it {0} - lval {1}".format(i, lval));
                     writer.add_summary(summary, i);
@@ -624,7 +673,7 @@ class Classifier(Model):
         -------
         Detailed accurancy concerning the current model
         """
-        return self.autoencoder.session.run([self.accuracy, self.accuracy_missed_by_one, self.accuracy_missed_by_two], feed_dict={self.input_placeholder: data, self.output_placeholder: desired_output});
+        return self.autoencoder_l.session.run([self.accuracy, self.accuracy_missed_by_one, self.accuracy_missed_by_two], feed_dict={self.input_placeholder: data, self.output_placeholder: desired_output});
 
     def suit_based_accurancy(self, test_data, test_labels, suits):
         """
@@ -679,7 +728,7 @@ class Classifier(Model):
             A number indicating the number of suits in the input data    
         """
         saver = tf.train.Saver();
-        saver.save(self.autoencoder.session, "./models/{0}".format(name));
+        saver.save(self.autoencoder_l.session, "./models/{0}".format(name));
 
     def restore_model(self, name):
         """
@@ -696,7 +745,7 @@ class Classifier(Model):
             Model filename
         """
         saver = tf.train.Saver();
-        saver.restore(self.autoencoder.session, "./models/{0}".format(name));
+        saver.restore(self.autoencoder_l.session, "./models/{0}".format(name));
 
     def multi_batch_test(self, suits, data_batches, outputs_batches, batch_count):
         """

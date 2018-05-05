@@ -1,11 +1,10 @@
-import re
 import numpy
-import tensorflow as tf;
-import random;
-import _pickle as pickle
 import os;
 import pprint;
+import random;
 
+import numpy
+import tensorflow as tf;
 
 """
     This module contains parsing operations for the datasets provided with this project.
