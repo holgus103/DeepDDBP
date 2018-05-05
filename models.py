@@ -204,8 +204,8 @@ class Autoencoder(Model):
     def build(cls, input_count, layer_counts, loss):
         a = cls(input_count, layer_counts, loss);
         a.prepare_session();
-        for i in range(0, l - 1):
-            a.create_weights(layer_counts[i], layer_counts[i + 1]);
+        for i in range(0, len(a.layer_counts)-1):
+            a.create_weights(a.layer_counts[i], a.layer_counts[i + 1]);
 
         init = tf.global_variables_initializer();
         a.session.run(init);
@@ -228,7 +228,7 @@ class Autoencoder(Model):
         """
         self.loss = loss;
         self.input_count = input_count;
-        self.layer_counts = layer_counts;
+        self.layer_counts = [input_count] +layer_counts;
         self.weights = [];
         self.biases = [];
         self.out_biases = [];
@@ -336,44 +336,64 @@ class Autoencoder(Model):
             prev_val = 0;
             it_counter = 0;
             while True:
-                for k in range(0, len(data)):
-                    lval, _, summary = self.session.run([loss_function, optimizer, summary_op], feed_dict={input : data[k]});
-                    if it_counter % 100 == 0:
-                        print("pretraining {0} - it {1} - lval {2}".format(i, it_counter, lval));
-                        writer.add_summary(summary, it_counter);
-                        # no significant change
-                        if prev_val != 0 and (prev_val - lval) < delta:
-                            if(no_improvement_counter > no_improvement):
-                                print("terminating due to no improvement");
-                                print("pretraining {0} - it {1} - lval {2}".format(i, it_counter, lval));
-                                return
-                            else:
-                                no_improvement_counter = no_improvement_counter + 1;
-                        prev_val = lval;
-                    it_counter = it_counter + 1;
+                acc_err = 0;
+                acc_cnt = 0;
+                for key, samples in data.items():
+                    for k in samples:
+                        lval, _, summary = self.session.run([loss_function, optimizer, summary_op], feed_dict={input : [np.array(k)]});
+                        acc_err += lval;
+                        acc_cnt += 1;
+                err = acc_err/acc_cnt;
+                if it_counter % 100 == 0:
+                    print("pretraining {0} - it {1} - lval {2}".format(i, it_counter, err));
+                    # writer.add_summary(summary, it_counter);
+                    # no significant change
+                    if prev_val != 0 and (prev_val - lval) < delta:
+                        if(no_improvement_counter > no_improvement):
+                            print("terminating due to no improvement");
+                            print("pretraining {0} - it {1} - lval {2}".format(i, it_counter, err));
+                            return
+                        else:
+                            no_improvement_counter = no_improvement_counter + 1;
+                    prev_val = err;
+                it_counter = it_counter + 1;
 
 
         elif it > 0:
             for j in range(1, it):
-                    for k in range(0, len(data)):
-                        lval, _, summary = self.session.run([loss_function, optimizer, summary_op], feed_dict={input : data[k]});
-                    if j % 100 == 0:
-                        print("pretraining {0} - it {1} - lval {2}".format(i, j, lval));
-                        writer.add_summary(summary, j);
+                acc_cnt = 0;
+                acc_err = 0;
+                for key, samples in data.items():
+                    for k in samples:
+                        lval, _, summary = self.session.run([loss_function, optimizer, summary_op], feed_dict={input : [np.array(k)]});
+                        acc_cnt += 1;
+                        acc_err += lval;
+
+                err = acc_err/acc_cnt;
+                if j % 100 == 0:
+                    print("pretraining {0} - it {1} - lval {2}".format(i, j, err));
+                    # writer.add_summary(summary, j);
         else:
             j = 0;
             while True:
-                for k in range(0, len(data)):
-                    _, summary, lval = self.session.run([optimizer, summary_op, loss_function], feed_dict={input : data[k]});
-                
+                acc_cnt = 0;
+                acc_err = 0;
+
+                for key, samples in data.items():
+                    for k in samples:
+                        _, summary, lval = self.session.run([optimizer, summary_op, loss_function], feed_dict={input : [np.array(k)]});
+                        acc_err += lval;
+                        acc_cnt += 1;
+
+                err = acc_err/acc_cnt;
                 if j % 100 == 0:
-                    print("pretraining {0} - it {1} - lval {2}".format(i, j, lval));
-                    writer.add_summary(summary, j);
+                    print("pretraining {0} - it {1} - lval {2}".format(i, j, err));
+                    # writer.add_summary(summary, j);
                 j = j + 1;
                 if(lval <= ep):
-                    print("pretraining ended {0} - it {1} - lval {2}".format(i, j, lval));
+                    print("pretraining ended {0} - it {1} - lval {2}".format(i, j, err));
                     break;
-            
+
 
             
     def build_complete_net(self, input):
@@ -593,9 +613,9 @@ class Classifier(Model):
                 lval = float(epoch_count) / float(epoch_count);
                 # every 100 iterations show results log summaries
                 if it_counter % 100 == 0:
-                    s = self.create_train_summary(train_data, train_output, test_data, test_output, train_suits, test_suits);
-                    current_val = self.test(test_data, test_output)[0];
-                    print(current_val);
+                    # s = self.create_train_summary(train_data, train_output, test_data, test_output, train_suits, test_suits);
+                    # current_val = self.test(test_data, test_output)[0];
+                    # print(current_val);
                     # save model
 
                     if it_counter % 1000 == 0:
@@ -618,13 +638,13 @@ class Classifier(Model):
                     prev_val = current_val;
                 it_counter = it_counter + 1;
 
-        else:
-            for i in range(0, it):
-                for k in range(0, len(data)):
-                    lval, _, summary = self.autoencoder_l.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder: data[k], self.output_placeholder: desired_output[k]});
-                if i % 100 == 0:
-                    print("finetuning - it {0} - lval {1}".format(i, lval));
-                    writer.add_summary(summary, i);
+        # else:
+        #     for i in range(0, it):
+        #         for k in range(0, len(data)):
+        #             lval, _, summary = self.autoencoder_l.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder: data[k], self.output_placeholder: desired_output[k]});
+        #         if i % 100 == 0:
+        #             print("finetuning - it {0} - lval {1}".format(i, lval));
+        #             writer.add_summary(summary, i);
 
     def get_accuracy_tensors(self):
         """

@@ -1,3 +1,5 @@
+import pickle
+
 import numpy
 import os;
 import pprint;
