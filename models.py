@@ -170,12 +170,12 @@ class Autoencoder(Model):
         for w in a.weights:
             _w = tf.Variable(w);
             self.weights.append(_w);
-            self.fixed_weights(tf.Variable(tf.identity(_w)))
+            self.fixed_weights.append(tf.Variable(tf.identity(_w)))
 
         # copy biases
         for b in a.biases:
             _b = tf.Variable(b);
-            self.biases.append(_b);_
+            self.biases.append(_b);
             self.fixed_biases.append(tf.Variable(tf.identity(_b)));
 
         # copy output biases
@@ -197,7 +197,7 @@ class Autoencoder(Model):
         a = cls(src.input_count, src.layer_counts, src.loss)
         a.clone_weights(src)
         a.__session = src.session;
-        a.session.run(tf.variables_initializer(a.weights + a.biases + a.fixed_biases))
+        a.session.run(tf.variables_initializer(a.weights + a.biases + a.fixed_biases + a.fixed_weights + a.out_biases + a.out_biases_fixed))
         return a;
 
     @classmethod
@@ -282,7 +282,6 @@ class Autoencoder(Model):
         """
         Pretrains one layer with specified parameters
         Please remember that the summary_path must contain one argument for formatting
-
         Parameters
         ----------
         self : Autoencoder
@@ -308,7 +307,6 @@ class Autoencoder(Model):
             Learning rate decay
         no_improvement : int
             If the error function value worsens the amount of times specified by this parameter the calculation will be aborted
-
         """
 
         input = self.input;
@@ -336,63 +334,44 @@ class Autoencoder(Model):
             prev_val = 0;
             it_counter = 0;
             while True:
-                acc_err = 0;
-                acc_cnt = 0;
-                for key, samples in data.items():
-                    for k in samples:
-                        lval, _, summary = self.session.run([loss_function, optimizer, summary_op], feed_dict={input : [np.array(k)]});
-                        acc_err += lval;
-                        acc_cnt += 1;
-                err = acc_err/acc_cnt;
-                if it_counter % 100 == 0:
-                    print("pretraining {0} - it {1} - lval {2}".format(i, it_counter, err));
-                    # writer.add_summary(summary, it_counter);
-                    # no significant change
-                    if prev_val != 0 and (prev_val - lval) < delta:
-                        if(no_improvement_counter > no_improvement):
-                            print("terminating due to no improvement");
-                            print("pretraining {0} - it {1} - lval {2}".format(i, it_counter, err));
-                            return
-                        else:
-                            no_improvement_counter = no_improvement_counter + 1;
-                    prev_val = err;
-                it_counter = it_counter + 1;
+                for k in range(0, len(data)):
+                    lval, _, summary = self.session.run([loss_function, optimizer, summary_op], feed_dict={input : data[k]});
+                    if it_counter % 100 == 0:
+                        print("pretraining {0} - it {1} - lval {2}".format(i, it_counter, lval));
+                        writer.add_summary(summary, it_counter);
+                        # no significant change
+                        if prev_val != 0 and (prev_val - lval) < delta:
+                            if(no_improvement_counter > no_improvement):
+                                print("terminating due to no improvement");
+                                print("pretraining {0} - it {1} - lval {2}".format(i, it_counter, lval));
+                                return
+                            else:
+                                no_improvement_counter = no_improvement_counter + 1;
+                        prev_val = lval;
+                    it_counter = it_counter + 1;
 
 
         elif it > 0:
             for j in range(1, it):
-                acc_cnt = 0;
-                acc_err = 0;
-                for key, samples in data.items():
-                    for k in samples:
-                        lval, _, summary = self.session.run([loss_function, optimizer, summary_op], feed_dict={input : [np.array(k)]});
-                        acc_cnt += 1;
-                        acc_err += lval;
-
-                err = acc_err/acc_cnt;
-                if j % 100 == 0:
-                    print("pretraining {0} - it {1} - lval {2}".format(i, j, err));
-                    # writer.add_summary(summary, j);
+                    for k in range(0, len(data)):
+                        lval, _, summary = self.session.run([loss_function, optimizer, summary_op], feed_dict={input : data[k]});
+                    if j % 100 == 0:
+                        print("pretraining {0} - it {1} - lval {2}".format(i, j, lval));
+                        writer.add_summary(summary, j);
         else:
             j = 0;
             while True:
-                acc_cnt = 0;
-                acc_err = 0;
-
-                for key, samples in data.items():
-                    for k in samples:
-                        _, summary, lval = self.session.run([optimizer, summary_op, loss_function], feed_dict={input : [np.array(k)]});
-                        acc_err += lval;
-                        acc_cnt += 1;
-
-                err = acc_err/acc_cnt;
+                for k in range(0, len(data)):
+                    _, summary, lval = self.session.run([optimizer, summary_op, loss_function], feed_dict={input : data[k]});
+                
                 if j % 100 == 0:
-                    print("pretraining {0} - it {1} - lval {2}".format(i, j, err));
-                    # writer.add_summary(summary, j);
+                    print("pretraining {0} - it {1} - lval {2}".format(i, j, lval));
+                    writer.add_summary(summary, j);
                 j = j + 1;
                 if(lval <= ep):
-                    print("pretraining ended {0} - it {1} - lval {2}".format(i, j, err));
+                    print("pretraining ended {0} - it {1} - lval {2}".format(i, j, lval));
                     break;
+
 
 
             
@@ -483,7 +462,7 @@ class Classifier(Model):
         self.input_placeholder_r = tf.placeholder("float", [None, self.autoencoder_r.input_count]);
         # build final encoding layers
         self.encoder_l = self.autoencoder_l.build_complete_net(self.input_placeholder_l);
-        self.encoder_r - self.autoencoder_r.build_complete_net(self.input_placeholder_r);
+        self.encoder_r = self.autoencoder_r.build_complete_net(self.input_placeholder_r);
 
         input_l = self.encoder_l[len(self.encoder_l) - 1];
         input_r = self.encoder_r[len(self.encoder_r) - 1];
@@ -497,11 +476,9 @@ class Classifier(Model):
         self.output_placeholder = tf.placeholder("float", [None, outputs]);
         self.get_accuracy_tensors();
         
-    def create_train_summary(self, data, output, test_data, test_output, train_suits, test_suits):
+    def create_train_summary(self, data_l, data_r, output, test_data_l, test_data_r, test_output, train_suits, test_suits):
         def add_values_for_whole_set(s, set_name, results):
             s.value.add(tag="{0} acc - exact".format(set_name), simple_value=results[0])
-            s.value.add(tag="{0} acc - off by 1".format(set_name), simple_value=results[1])
-            s.value.add(tag="{0} acc - off by 2".format(set_name), simple_value=results[2])
 
         def add_suit_values_for_set(s, set_name, results, suits):
             initial = 0;
@@ -516,10 +493,10 @@ class Classifier(Model):
                 add_values_for_whole_set(s, "Clubs - {0}".format(set_name), results[initial + 3]);
 
         s = tf.Summary();
-        r_tr = self.test(data, output);
-        r_test = self.test(test_data, test_output);
-        suits_tr = self.suit_based_accurancy(data, output, train_suits);
-        suits_test = self.suit_based_accurancy(test_data, test_output, test_suits);
+        r_tr = self.test(data_l, data_r, output);
+        r_test = self.test(test_data_l, test_data_r, test_output);
+        suits_tr = self.suit_based_accurancy(data_l, data_r, output, train_suits);
+        suits_test = self.suit_based_accurancy(test_data_l, test_data_r, test_output, test_suits);
         # save accuracy for whole sets
         add_values_for_whole_set(s, "Train", r_tr);
         add_values_for_whole_set(s, "Test", r_test);
@@ -528,7 +505,7 @@ class Classifier(Model):
         add_suit_values_for_set(s, "Test", suits_test, test_suits);
         return s;
 
-    def train(self, data, learning_rate, it, delta, path, train_data, train_output, test_data, test_output, train_suits = 5, test_suits = 5, loss_f = Model.mse_loss, no_improvement = 5, experiment_name = ""):
+    def train(self, data_l, data_r, desired_output, learning_rate, it, delta, path, train_data_l, train_data_r, train_output, test_data_l, test_data_r, test_output, train_suits = 5, test_suits = 5, loss_f = Model.mse_loss, no_improvement = 5, experiment_name = ""):
         """
         Main train method
     
@@ -562,10 +539,10 @@ class Classifier(Model):
         loss = loss_f(self.output_placeholder, self.layer);
         opt = tf.train.RMSPropOptimizer(learning_rate);
         optimizer = opt.minimize(loss);
-        self.autoencoder_l.session.run(tf.variables_initializer([self.weights, self.biases]));
-        self.autoencoder_l.session.run(tf.variables_initializer())
-        slot_vars = [self.weights, self.biases] + self.autoencoder_l.biases + self.autoencoder_l.weights;
-        self.autoencoder_l.session.run(Model.initialize_optimizer(opt, slot_vars));
+        self.session.run(tf.variables_initializer([self.weights, self.biases]));
+        slot_vars = [self.weights, self.biases] + self.autoencoder_r.weights+ self.autoencoder_l.weights + self.autoencoder_l.biases + self.autoencoder_r.biases;
+        self.session.run(Model.initialize_optimizer(opt, slot_vars));
+        #self.session.run(tf.initialize_all_variables());
         hist_summaries = [(self.autoencoder_l.weights[i], 'weights{0}'.format(i)) for i in range(0, len(self.autoencoder_l.weights))];
         hist_summaries.extend([(self.autoencoder_l.biases[i], 'biases{0}'.format(i)) for i in range(0, len(self.autoencoder_l.weights))]);
         summaries = [tf.summary.histogram(v[1], v[0]) for v in hist_summaries];
@@ -574,11 +551,6 @@ class Classifier(Model):
 
         writer = tf.summary.FileWriter(path, graph=self.autoencoder_l.session.graph)
 
-        available_keys = [];
-        # find available keys
-        for i in range(0, 14):
-            if i in data and len(data[i]) > 0:
-                available_keys.append(i);
 
         if delta > 0:
             prev_val = 0;
@@ -586,50 +558,19 @@ class Classifier(Model):
             no_improvement_counter = 0;
             it_counter = 0;
             while True:
-                # for every key
-                epoch_error = 0;
-                epoch_count = 0;
-                for index in range(0, len(available_keys)):
-                    for inner in range(index + 1, len(available_keys)):
-                        data_left = data[available_keys[index]];
-                        data_right = data[available_keys[inner]];
-                        for entry_l in data_left:
-                            for entry_r in data_right:
-                                err = 0;
-                                lval, _ = self.session.run([loss, optimizer], \
-                                                           feed_dict={self.input_placeholder_l: entry_l, \
-                                                                      self.input_placeholder_r: entry_r, \
-                                                                      self.output_placeholder: [np.array([0, 1])]});
-                                err += lval;
-
-                                lval, _ = self.session.run([loss, optimizer], \
-                                                           feed_dict={self.input_placeholder_r: entry_l, \
-                                                                      self.input_placeholder_r: entry_r, \
-                                                                      self.output_placeholder: [np.array([1, 0])]});
-                                err += lval;
-                                epoch_error += err;
-                                epoch_count += 2;
-                # calculate average error
-                lval = float(epoch_count) / float(epoch_count);
-                # every 100 iterations show results log summaries
+                for k in range(0, len(data_r)):
+                    lval, _, summary = self.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder_l: data_l[k], self.input_placeholder_r: data_r[k], self.output_placeholder: desired_output[k]});
                 if it_counter % 100 == 0:
-                    # s = self.create_train_summary(train_data, train_output, test_data, test_output, train_suits, test_suits);
-                    # current_val = self.test(test_data, test_output)[0];
-                    # print(current_val);
-                    # save model
-
-                    if it_counter % 1000 == 0:
-                        self.save_model(experiment_name + " at {0}".format(it_counter))
-
+                    s = self.create_train_summary(train_data_l, train_data_r, train_output, test_data_l, test_data_r, test_output, train_suits, test_suits);
+                    current_val = self.test(test_data_l, test_data_r, test_output)[0];
+                    print(current_val);
+                    self.save_model(experiment_name + " at {0}".format(it_counter))
                     print("finetuning - it {0} - lval {1}".format(it_counter, lval));
-                    # create error summary
-                    summary = tf.Summary();
-                    summary.value.add(tag="loss_finetuning", simple_value=lval)
                     writer.add_summary(summary, it_counter);
                     writer.add_summary(s, it_counter);
                     if prev_val != 0 and (current_val - prev_val) < delta:
                         print(current_val - prev_val);
-                        if no_improvement_counter > no_improvement:
+                        if(no_improvement_counter > no_improvement):
                             print("terminating due to no improvement");
                             print("finetuning - it {0} - lval {1}".format(it_counter, lval));
                             return
@@ -638,13 +579,13 @@ class Classifier(Model):
                     prev_val = current_val;
                 it_counter = it_counter + 1;
 
-        # else:
-        #     for i in range(0, it):
-        #         for k in range(0, len(data)):
-        #             lval, _, summary = self.autoencoder_l.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder: data[k], self.output_placeholder: desired_output[k]});
-        #         if i % 100 == 0:
-        #             print("finetuning - it {0} - lval {1}".format(i, lval));
-        #             writer.add_summary(summary, i);
+        else:
+            for i in range(0, it):
+                for k in range(0, len(data)):
+                    lval, _, summary = self.autoencoder.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder_l: data_l[k], self.input_placeholder_r: data_r,  self.output_placeholder: desired_output[k]});
+                if i % 100 == 0:
+                    print("finetuning - it {0} - lval {1}".format(i, lval));
+                    writer.add_summary(summary, i);
 
     def get_accuracy_tensors(self):
         """
@@ -664,15 +605,11 @@ class Classifier(Model):
             Tuple containing all tensors hold accuracy values
         """
         correct_prediction = tf.equal(tf.argmax(self.layer, 1), tf.argmax(self.output_placeholder, 1));
-        missed_by_one = tf.less_equal(tf.abs(tf.argmax(self.layer, 1) - tf.argmax(self.output_placeholder, 1)), 1);
-        missed_by_two = tf.less_equal(tf.abs(tf.argmax(self.layer, 1) - tf.argmax(self.output_placeholder, 1)), 2);
 
         self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-        self.accuracy_missed_by_one = tf.reduce_mean(tf.cast(missed_by_one, "float"))
-        self.accuracy_missed_by_two = tf.reduce_mean(tf.cast(missed_by_two, "float"))
-        return (self.accuracy, self.accuracy_missed_by_one, self.accuracy_missed_by_two);
+        return self.accuracy;
         
-    def test(self, data, desired_output):
+    def test(self, data_l, data_r, desired_output):
         """
         Test method
     
@@ -693,9 +630,9 @@ class Classifier(Model):
         -------
         Detailed accurancy concerning the current model
         """
-        return self.autoencoder_l.session.run([self.accuracy, self.accuracy_missed_by_one, self.accuracy_missed_by_two], feed_dict={self.input_placeholder: data, self.output_placeholder: desired_output});
+        return self.autoencoder_l.session.run([self.accuracy], feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
 
-    def suit_based_accurancy(self, test_data, test_labels, suits):
+    def suit_based_accurancy(self, test_data_l, test_data_r, test_labels, suits):
         """
         Advanced testing method
     
@@ -722,12 +659,13 @@ class Classifier(Model):
         list
             List of results for each suit
         """
-        l = len(test_data);
+        l = len(test_data_r);
         res = [];
         for i in range(0, suits):        
-            input = [test_data[x] for x in range(0, l) if x % (suits * 4) in range(4 * i, 4*i + 4)];
+            input_l = [test_data_l[x] for x in range(0, l) if x % (suits * 4) in range(4 * i, 4*i + 4)];
+            input_r = [test_data_r[x] for x in range(0, l) if x % (suits * 4) in range(4 * i, 4*i + 4)];
             labels = [test_labels[x] for x in range(0, l) if x % (suits * 4) in range(4 * i, 4*i + 4)];
-            res.append(self.test(input, labels));
+            res.append(self.test(input_l, input_r, labels));
         return res;
 
     def save_model(self, name):

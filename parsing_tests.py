@@ -12,13 +12,13 @@ PARTITION = 1
 SET_SIZE = 2
 
 def testPlayerRotations():
-    (data, outputs) = dp.read_file("./data/sol100000.txt", SET_SIZE, True, TRAIN_NO_TRUMP, TRAIN_TRUMP, TEST_NO_TRUMP, TEST_TRUMP, PARTITION);
+    (data, outputs, test_data, test_outputs) = dp.read_file("./data/sol100000.txt", SET_SIZE, True, TRAIN_NO_TRUMP, TRAIN_TRUMP, TEST_NO_TRUMP, TEST_TRUMP, PARTITION);
     for i in range(0, 4):
         #print("i: {0}".format(i))
-        c = data[6][0][(i*52):((i+1)*52)]      
+        c = data[0][(i*52):((i+1)*52)]      
         start = (i + 2) % 4;
         end = (i + 2) % 4 + 1
-        if(not np.array_equal(data[6][1][start*52:end*52], c)):
+        if(not np.array_equal(data[1][start*52:end*52], c)):
             print("FAILURE i: {0}".format(i))
             return False;
     return True;
@@ -39,10 +39,10 @@ line = "T5.K4.652.A98542 K6.QJT976.QT7.Q6 432.A.AKJ93.JT73 AQJ987.8532.84.K:6565
     # '3' : 11,
     # '2' : 12,
 
-nt_0 = [0,0,0,0,0,0,1,0,0,0,0,0,0,0];
-nt_1 = [0,0,0,0,0,1,0,0,0,0,0,0,0,0];
-nt_2 = [0,0,0,0,0,0,1,0,0,0,0,0,0,0];
-nt_3 = [0,0,0,0,0,1,0,0,0,0,0,0,0,0];
+nt_0 = 6
+nt_1 = 5
+nt_2 = 6
+nt_3 = 5
 # T5.K4.652.A98542
 p1_spades =     [0,0,0,0,1,0,0,0,0,1,0,0,0]; # T5
 p1_hearts =     [0,1,0,0,0,0,0,0,0,0,1,0,0]; # K4
@@ -86,8 +86,7 @@ def array_assert(arr1, arr2):
 
 def parseNoTrump():
     print("parseNoTrump:");
-    data = {}
-    dp.parse(line, data, True, False);
+    (data, outputs) = dp.parse(line, True, False);
     p1 = p1_spades + p1_hearts + p1_diamonds + p1_clubs
     p2 = p2_spades + p2_hearts + p2_diamonds + p2_clubs
     p3 = p3_spades + p3_hearts + p3_diamonds + p3_clubs
@@ -95,12 +94,12 @@ def parseNoTrump():
     out = [nt_0, nt_2];
     inputs = [p1 + p2 + p3 + p4, p3 + p4 + p1 + p2] 
     for i in range(0,2):
-        print(array_assert(data[6][i], inputs[i]))
+        print(array_assert(data[i], inputs[i]))
+        print(array_assert([out[i]], [outputs[i]]))
 
 def parseColors():
     print("printColors:")
-    data = {}
-    dp.parse(line, data, False, True);
+    (data, outputs) = dp.parse(line, False, True);
     p1 = [\
             p1_spades + p1_hearts + p1_diamonds + p1_clubs, \
             p1_hearts + p1_spades + p1_diamonds + p1_clubs, \
@@ -140,9 +139,8 @@ def parseColors():
                 p1[3] + p2[3] + p3[3] + p4[3],\
                 p3[3] + p4[3] + p1[3] + p2[3],\
     ]     
-    indexes = [8,8,8,8,4,4,3,3]
     for i in range(0, len(data)):
-        print(array_assert(hands[i], data[indexes[i]][i]));
+        print(array_assert(hands[i], data[i]));
 
 print(testPlayerRotations());
 testParseHand();

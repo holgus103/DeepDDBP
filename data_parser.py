@@ -1,12 +1,11 @@
-import pickle
-
-import numpy
-import os;
-import pprint;
-import random;
-
+import re
 import numpy
 import tensorflow as tf;
+import random;
+import _pickle as pickle
+import os;
+import pprint;
+
 
 """
     This module contains parsing operations for the datasets provided with this project.
@@ -18,7 +17,7 @@ import tensorflow as tf;
 
 """
 
-def parse(input, data, no_trump, trump):
+def parse(input, no_trump, trump):
     """
     Parse function used to process one line
 
@@ -26,8 +25,6 @@ def parse(input, data, no_trump, trump):
     ----------
     input : string
         A deal encoded in the format specified above
-    data : Dict
-        Dictionary Tricks, input
     no_trump : bool
         Boolean value indicating whether No Trump games are to be skipped or not
     trump : bool
@@ -56,25 +53,24 @@ def parse(input, data, no_trump, trump):
         'D' : 13, 
     }
     t = input.split(":");
+    data = [];
+    outputs = [];
     vals = t[0].split(" ");    
 
 
     b = (no_trump and 1 or 2) - 1 ;
     e = trump and 5 or 1;
 
-    res = [];
     for i in range(b*4,e*4):
         if(i % 2 == 1):
             continue;
         else:
             c = t[1][i];
-            res.append(dict[c])
-        #     arr = numpy.repeat(0, 14);
-        #     if c=="\n":
-        #         continue
-        #     arr[dict[c]] = 1;
-        #     outputs.append(arr);
-        # if c=="\n":s
+            if c=="\n":
+                continue
+            arr = dict[c];
+            outputs.append(arr);
+        # if c=="\n":
         #     continue
         # arr = dict[c] * 1.0 / 14.0 + 0.5/14.0
         # outputs.append(arr);
@@ -83,7 +79,7 @@ def parse(input, data, no_trump, trump):
     org_deals = [process_player(vals[i]) for i in range(0, 4)];
     #players = [[player[(i*13):((i+1):13)] for i in range(0, 4)] for player in deal]
     # return (deals, outputs);
-    count = 0;
+
     # no trump, spades, hearts, diamonds, clubs
     for suit in range(b, e):
         # south, east, north, west
@@ -97,10 +93,10 @@ def parse(input, data, no_trump, trump):
                     deals[k][13*(suit-1):13*suit] = spades;
             current = deals[(4-vist):(len(deals))] + deals[0:(4-vist)];
             #current = numpy.concatenate(deals);
-            if not(res[count] in data):
-                data[res[count]] = [];
 
-            data[res[count]].append(numpy.concatenate(current));
+            data.append(numpy.concatenate(current));
+            
+    return (data, outputs); 
 
     
 
@@ -173,12 +169,16 @@ def read_file(path, lines_count, shuffle = False, no_trump = True, trump = True,
         Tuple of lists containing a set of generated inputs and a set of corresponding outputs (training and test data)
 
     """
-    def process(data, line, no_trump, trump):
-        parse(line, data, no_trump, trump);
+    def process(data_set, outputs_set, line, no_trump, trump):
+        data, outputs = parse(line, no_trump, trump);
+        data_set.append(data)
+        outputs_set.append(outputs)
 
     test_end = int(lines_count * split);
-    data = {}
-    test = {}
+    data_set = []
+    outputs_set = []
+    test_set = []
+    test_outputs_set = []
     line_number = 1
     lines = [];
     with open(path, "r") as file:
@@ -192,9 +192,9 @@ def read_file(path, lines_count, shuffle = False, no_trump = True, trump = True,
                 if line_number % 100  == 0:
                     print("Reading line {0}".format(line_number));
                 if line_number < test_end:
-                    process(data, line, no_trump, trump);
+                    process(data_set, outputs_set, line, no_trump, trump);
                 else:
-                    process(test, line, no_trump_test, trump_test);
+                    process(test_set, test_outputs_set, line, no_trump_test, trump_test);
             #data_set = data_set + data;
             #outputs_set = outputs_set + outputs;
             line_number = line_number + 1
@@ -205,11 +205,11 @@ def read_file(path, lines_count, shuffle = False, no_trump = True, trump = True,
             if line_number % 100  == 0:
                 print("Reading line {0}".format(line_number));
             if line_number < test_end:
-                process(data, line, no_trump, trump);
+                process(data_set, outputs_set, line, no_trump, trump);
             else:
-                process(test, line, no_trump_test, trump_test);
+                process(test_set, test_outputs_set, line, no_trump_test, trump_test);
             line_number = line_number + 1;
-    return (data, test)
+    return combine_data_sets(data_set, outputs_set) + combine_data_sets(test_set, test_outputs_set);
 
 def combine_data_sets(data_sets, output_sets):
     """
@@ -314,6 +314,36 @@ def save_distribution(path, train_dist, test_dist):
 
     f.close();
 
+def process_zipped_sets(zipped):
+    samples_l = [];
+    samples_r = [];
+    outputs = [];
+    for val in zipped:
+        l = val[0];
+        r = val[1];
+        samples_l.append(l[0]);
+        samples_r.append(r[0]);
+        if l[1] > r[1]:
+            outputs.append(numpy.array([1, 0]));
+        elif l[1] < r[1]:
+            outputs.append(numpy.array([0, 1]));
+        else:
+            outputs.append(numpy.array([1, 1]));
+    return (samples_l, samples_r, outputs);
+
+def generate_random_pairs(data, labels, count):
+    input = list(zip(data, labels))
+    left = random.sample(list(input), count);
+    right = random.sample(input, count); 
+    return process_zipped_sets(zip(left, right));
+
+
+def generate_random_pair_for_samples(data, labels):
+    count = len(data)
+    input = list(zip(data, labels));
+    right = random.sample(input, count); 
+    return process_zipped_sets(zip(input, right));
+      
 
 def initialize_random(name):
     random.seed();
