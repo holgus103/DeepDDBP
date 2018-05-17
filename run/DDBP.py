@@ -11,10 +11,11 @@ TRAIN_NO_TRUMP = True
 BATCHES = 4
 PARTITION = 0.5
 SET_SIZE = 400000
-EXPERIMENT = "no_trump_l_104_52_13_p104_c_3"
+EXPERIMENT = "no_trump_l_104_52_13_p104_c_3_each"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
+# each - generate_random_pair_for_samples
 
 
 
@@ -31,8 +32,8 @@ dp.initialize_random(experiment_name);
 
 # import data
 (data, labels, test_data, test_labels) = dp.read_file("./../data/library", SET_SIZE, True, TRAIN_NO_TRUMP, TRAIN_TRUMP, TEST_NO_TRUMP, TEST_TRUMP, PARTITION);
-(samples_l, samples_r, outputs) = dp.generate_random_pairs(data, labels, len(data));
-(test_samples_l, test_samples_r, test_outsputs) = dp.generate_random_pairs(test_data, test_labels, len(test_data));
+(samples_l, samples_r, outputs) = dp.generate_random_pair_for_samples(data, labels);
+(test_samples_l, test_samples_r, test_outsputs) = dp.generate_random_pair_for_samples(test_data, test_labels);
 
 
 # calculate test set length
