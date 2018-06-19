@@ -11,7 +11,7 @@ TRAIN_NO_TRUMP = True
 BATCHES = 4
 PARTITION = 0.5
 SET_SIZE = 400000
-EXPERIMENT = "no_trump_l_104_52_13_p104_c_3_each"
+EXPERIMENT = "no_trump_l_104_52_13_p104_c_3_each_detailed"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
@@ -32,8 +32,8 @@ dp.initialize_random(experiment_name);
 
 # import data
 (data, labels, test_data, test_labels) = dp.read_file("./../data/library", SET_SIZE, True, TRAIN_NO_TRUMP, TRAIN_TRUMP, TEST_NO_TRUMP, TEST_TRUMP, PARTITION);
-(samples_l, samples_r, outputs) = dp.generate_random_pair_for_samples(data, labels);
-(test_samples_l, test_samples_r, test_outsputs) = dp.generate_random_pair_for_samples(test_data, test_labels);
+(samples_l, samples_r, outputs, diffs) = dp.generate_random_pair_for_samples(data, labels);
+(test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_random_pair_for_samples(test_data, test_labels);
 
 
 # calculate test set length
@@ -55,10 +55,7 @@ for i in range(0, batch_count-1):
 data_batches.append(data[(batch_count - 1) * batch_size : l]);
 outputs_batches.append(outputs[(batch_count - 1) * batch_size : l]);
 print(len(data_batches[0]))
-#print(len(data_batches[1]))
-# d_train = dp.get_distribution(data, outputs);
-# d_test = dp.get_distribution(test_data, test_outputs);
-# dp.save_distribution(path, d_train, d_test);
+
 optimizer = tf.train.RMSPropOptimizer 
 print(len(data));
 print(len(test_data))
@@ -68,12 +65,12 @@ a = models.Autoencoder.build(208, [104, 52, 13], models.Model.cross_entropy_loss
 
 
 # pretrain each layer
-a.pretrain(0.001, 0, 1000, data_batches, 0, 0.1, path + "{0}" , optimizer, 0.2, 15);
+a.pretrain(0.001, 0, 1000, data_batches, 0, 10, path + "{0}" , optimizer, 0.2, 15);
 
 # create classifier
 c = models.Classifier(a, 3);
 # train whole network
-c.train(data_batches_l, data_batches_r, outputs_batches, 0.0001, 15000, 0.0001, path +"/finetuning", samples_l, samples_r, outputs, test_samples_l, test_samples_r, test_outsputs, dp.suit_count_for_params(TRAIN_NO_TRUMP, TRAIN_TRUMP), dp.suit_count_for_params(TEST_NO_TRUMP, TEST_TRUMP), models.Model.mse_loss, 25, experiment_name);
+c.train(data_batches_l, data_batches_r, outputs_batches, 0.0001, 15000, 0.0001, path +"/finetuning", samples_l, samples_r, outputs, diffs, test_samples_l, test_samples_r, test_outsputs, test_diffs, dp.suit_count_for_params(TRAIN_NO_TRUMP, TRAIN_TRUMP), dp.suit_count_for_params(TEST_NO_TRUMP, TEST_TRUMP), models.Model.mse_loss, 25, experiment_name);
 
 # evaluate results
 # print(c.test(data, outputs));

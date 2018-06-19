@@ -318,18 +318,21 @@ def process_zipped_sets(zipped):
     samples_l = [];
     samples_r = [];
     outputs = [];
+    diffs = [];
     for val in zipped:
         l = val[0];
         r = val[1];
+        diffs.append(abs(l[1] - r[1]))
         samples_l.append(l[0]);
         samples_r.append(r[0]);
         if l[1] > r[1]:
             outputs.append(numpy.array([1, 0, 0]));
         elif l[1] < r[1]:
-            outputs.append(numpy.array([0, 1, 0]));
-        else:
             outputs.append(numpy.array([0, 0, 1]));
-    return (samples_l, samples_r, outputs);
+        else:
+            outputs.append(numpy.array([0, 1, 0]));
+
+    return (samples_l, samples_r, outputs, diffs);
 
 def generate_random_pairs(data, labels, count):
     input = list(zip(data, labels))

@@ -476,36 +476,39 @@ class Classifier(Model):
         self.output_placeholder = tf.placeholder("float", [None, outputs]);
         self.get_accuracy_tensors();
         
-    def create_train_summary(self, data_l, data_r, output, test_data_l, test_data_r, test_output, train_suits, test_suits):
-        def add_values_for_whole_set(s, set_name, results):
-            s.value.add(tag="{0} acc - exact".format(set_name), simple_value=results[0])
+    def create_train_summary(self, data_l, data_r, output, diffs, test_data_l, test_data_r, test_output, test_diffs):
 
-        def add_suit_values_for_set(s, set_name, results, suits):
-            initial = 0;
-            if suits != 4:
-                add_values_for_whole_set(s, "No trump - {0}".format(set_name), results[0]);
-                initial = 1;
+        def draw_whole_set(s, res, type):
+            # draw corrects
+            for i in range(0, 14):
+                s.value.add(tag="{0} - Correct - difference {1}".format(type, i), simple_value=res[i])
+            # draw wrong
+            for i in range(0, 14):
+                s.value.add(tag="{0} - Wrong - difference {1}".format(type, i), simple_value=res[14 + i])
+            # draw error propotions for every class
+            for i in range(0, 14):
+                s.value.add(tag="{0} - Wins as Draws - difference {1}".format(type, i), simple_value=res[28 + i*6]) 
+                s.value.add(tag="{0} - Wins as Losses - difference {1}".format(type, i), simple_value=res[28 + i*6 + 1])   
+                s.value.add(tag="{0} - Draws as Wins - difference {1}".format(type, i), simple_value=res[28 + i*6 + 2])   
+                s.value.add(tag="{0} - Draws as Losses - difference {1}".format(type, i), simple_value=res[28 + i*6 + 3])   
+                s.value.add(tag="{0} - Losses as Wins - difference {1}".format(type, i), simple_value=res[28 + i*6 + 4])   
+                s.value.add(tag="{0} - Losses as Draws - difference {1}".format(type, i), simple_value=res[28 + i*6 + 5])          
+            
+            s.value.add(tag="{0} accuracy".format(type), simple_value=res[112])
 
-            if suits != 1:
-                add_values_for_whole_set(s, "Spades - {0}".format(set_name), results[initial]);
-                add_values_for_whole_set(s, "Hearts - {0}".format(set_name), results[initial + 1]);
-                add_values_for_whole_set(s, "Diamonds - {0}".format(set_name), results[initial + 2]);
-                add_values_for_whole_set(s, "Clubs - {0}".format(set_name), results[initial + 3]);
+            return s;
 
+    
         s = tf.Summary();
-        r_tr = self.test(data_l, data_r, output);
-        r_test = self.test(test_data_l, test_data_r, test_output);
-        suits_tr = self.suit_based_accurancy(data_l, data_r, output, train_suits);
-        suits_test = self.suit_based_accurancy(test_data_l, test_data_r, test_output, test_suits);
-        # save accuracy for whole sets
-        add_values_for_whole_set(s, "Train", r_tr);
-        add_values_for_whole_set(s, "Test", r_test);
-        # save accuracy for suits
-        add_suit_values_for_set(s, "Train", suits_tr, train_suits);
-        add_suit_values_for_set(s, "Test", suits_test, test_suits);
+        r_tr = self.test(data_l, data_r, output, diffs);
+        r_test = self.test(test_data_l, test_data_r, test_output, test_diffs);
+        s = draw_whole_set(s, r_tr, "Train");
+        s = draw_whole_set(s, r_test, "Test");
+
+
         return s;
 
-    def train(self, data_l, data_r, desired_output, learning_rate, it, delta, path, train_data_l, train_data_r, train_output, test_data_l, test_data_r, test_output, train_suits = 5, test_suits = 5, loss_f = Model.mse_loss, no_improvement = 5, experiment_name = ""):
+    def train(self, data_l, data_r, desired_output, learning_rate, it, delta, path, train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs, train_suits = 5, test_suits = 5, loss_f = Model.mse_loss, no_improvement = 5, experiment_name = ""):
         """
         Main train method
     
@@ -561,9 +564,9 @@ class Classifier(Model):
                 for k in range(0, len(data_r)):
                     lval, _, summary = self.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder_l: data_l[k], self.input_placeholder_r: data_r[k], self.output_placeholder: desired_output[k]});
                 if it_counter % 100 == 0:
-                    s = self.create_train_summary(train_data_l, train_data_r, train_output, test_data_l, test_data_r, test_output, train_suits, test_suits);
-                    current_val = self.test(test_data_l, test_data_r, test_output)[0];
-                    print(current_val);
+                    s = self.create_train_summary(train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs);
+                    #current_val = self.test(test_data_l, test_data_r, test_output)[0];
+                    #print(current_val);
                     self.save_model(experiment_name + " at {0}".format(it_counter))
                     print("finetuning - it {0} - lval {1}".format(it_counter, lval));
                     writer.add_summary(summary, it_counter);
@@ -609,7 +612,7 @@ class Classifier(Model):
         self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
         return self.accuracy;
         
-    def test(self, data_l, data_r, desired_output):
+    def test(self, data_l, data_r, desired_output, diffs):
         """
         Test method
     
@@ -630,43 +633,42 @@ class Classifier(Model):
         -------
         Detailed accurancy concerning the current model
         """
-        return self.autoencoder_l.session.run([self.accuracy], feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
-
-    def suit_based_accurancy(self, test_data_l, test_data_r, test_labels, suits):
-        """
-        Advanced testing method
-    
-        This method is used to obtain the accurancy of the created model including information such as:
-            - Exact deal match percentage
-            - Actual deal missed by 1 percentage
-            - Actual deal missed by 2 percentage
-
-        This method is the extended version of the test method, as it calculates the above mentioned values separately
-        for every suit i.e. separately for No Trump, Diamonds Trump, Hearts Trump, Spades Trump and Clubs Trump games. 
-
-        Parameters
-        ----------
-        self : Classifier 
-        test_data : list
-            List of numpy arrays with training inputs which will be fed to the input placeholder
-        test_labels : list
-            List of numpy arrays with labels for the corresponding training inputs
-        suits : int
-            A number indicating the number of suits in the input data    
-
-        Returns
-        -------
-        list
-            List of results for each suit
-        """
-        l = len(test_data_r);
         res = [];
-        for i in range(0, suits):        
-            input_l = [test_data_l[x] for x in range(0, l) if x % (suits * 4) in range(4 * i, 4*i + 4)];
-            input_r = [test_data_r[x] for x in range(0, l) if x % (suits * 4) in range(4 * i, 4*i + 4)];
-            labels = [test_labels[x] for x in range(0, l) if x % (suits * 4) in range(4 * i, 4*i + 4)];
-            res.append(self.test(input_l, input_r, labels));
-        return res;
+        output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
+        l = len(diffs)
+        correct = np.repeat(0, 14);
+        wrongs = np.repeat(0, 14);
+        # win - losses, draws; draws - wins, losses; losses - wins, draws 
+        errors = np.repeat(0, 6*14)
+        for i in range(0,l):
+            # correct answer
+            if (desired_output[i].argmax() == output[i].argmax()):
+                correct[diffs[i]] += 1
+            # wrong answer
+            else:
+                cls = diffs[i]   
+                wrongs[cls] += 1;             
+                expected = desired_output[i].argmax()
+                actual = output[i].argmax()
+                if(expected == 0):
+                    actual -= 1;
+                elif (expected == 1):
+                    actual = (actual == 2 and 1 or 0)   
+                errors[cls*6 + expected*2 + actual] += 1;
+        c_sum = np.sum(correct) or 1
+        c_normalized = [(float(i)/float(c_sum)) for i in correct];
+        w_sum = np.sum(wrongs) or 1;
+        w_normalized = [(float(i)/float(w_sum)) for i in wrongs];
+        res.extend(c_normalized);
+        res.extend(w_normalized);
+
+        for i in range(0, 14):
+            s = np.sum(errors[i*6:(i+1)*6]) or 1;
+            res.extend([float(v)/float(s) for v in errors[i*6:(i+1)*6]])
+        acc = self.session.run(self.accuracy, feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
+        res.append(acc);
+        return res;          
+            
 
     def save_model(self, name):
         """
