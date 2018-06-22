@@ -4,14 +4,14 @@ import sys;
 import tensorflow as tf
 
 # configure here
-TEST_TRUMP = False
-TRAIN_TRUMP = False
-TEST_NO_TRUMP = True
-TRAIN_NO_TRUMP = True
+TEST_TRUMP = True
+TRAIN_TRUMP = True
+TEST_NO_TRUMP = False
+TRAIN_NO_TRUMP = False
 BATCHES = 4
 PARTITION = 0.5
-SET_SIZE = 400000
-EXPERIMENT = "no_trump_l_104_52_13_p104_c_3_detailed"
+SET_SIZE = 200000
+EXPERIMENT = "trump_l_104_52_13_p104_c_3_detailed"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
