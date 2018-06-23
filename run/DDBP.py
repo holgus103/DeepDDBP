@@ -11,7 +11,7 @@ TRAIN_NO_TRUMP = False
 BATCHES = 4
 PARTITION = 0.5
 SET_SIZE = 200000
-EXPERIMENT = "trump_l_104_52_13_p104_c_3_detailed"
+EXPERIMENT = "trump_l_104_52_13_p104_c_3_detailed_each"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
@@ -32,7 +32,7 @@ dp.initialize_random(experiment_name);
 
 # import data
 (data, labels, test_data, test_labels) = dp.read_file("./../data/library", SET_SIZE, True, TRAIN_NO_TRUMP, TRAIN_TRUMP, TEST_NO_TRUMP, TEST_TRUMP, PARTITION);
-(samples_l, samples_r, outputs, diffs) = dp.generate_random_pairs(data, labels, len(data));
+(samples_l, samples_r, outputs, diffs) = dp.generate_random_pair_for_samples(data, labels);
 (test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_random_pair_for_samples(test_data, test_labels);
 
 
@@ -65,7 +65,7 @@ a = models.Autoencoder.build(208, [104, 52, 13], models.Model.cross_entropy_loss
 
 
 # pretrain each layer
-a.pretrain(0.001, 0, 1000, data_batches, 0, 10, path + "{0}" , optimizer, 0.2, 15);
+a.pretrain(0.001, 0, 1000, data_batches, 0, 0.1, path + "{0}" , optimizer, 0.2, 15);
 
 # create classifier
 c = models.Classifier(a, 3);
