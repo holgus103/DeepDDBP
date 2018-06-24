@@ -291,16 +291,12 @@ def divide_into_batches(batch_count, data_batches, outputs_batches, data, output
     data_batches.append(data[(batch_count - 1) * batch_size : l]);
     outputs_batches.append(outputs[(batch_count - 1) * batch_size : l]);
         
-def get_distribution(data, outputs):
-    final = []
-    for suit in range(0,5):
-        res = numpy.repeat(0, 14);
-        for i in range(0, len(data)):
-            if data[i][suit] == 1:
-                c = outputs[i].argmax();
-                res[c] = res[c] + 1;
-        final.append(res);
+def get_distribution(diffs):
+    final = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for v in diffs:
+        final[v] += 1
     return final;
+    
 
 def save_distribution(path, train_dist, test_dist):
     whole = path + "distributions.txt";
