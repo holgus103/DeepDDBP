@@ -33,7 +33,7 @@ dp.initialize_random(experiment_name);
 # import data
 (data, labels, test_data, test_labels) = dp.read_file("./../data/library", SET_SIZE, True, TRAIN_NO_TRUMP, TRAIN_TRUMP, TEST_NO_TRUMP, TEST_TRUMP, PARTITION);
 (samples_l, samples_r, outputs, diffs) = dp.generate_random_pairs(data, labels, len(data));
-(test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_random_pair_for_samples(test_data, test_labels);
+(test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_random_pairs(test_data, test_labels, len(data));
 
 # get sample counts
 dp.save_distribution(path, dp.get_distribution(diffs), dp.get_distribution(test_diffs))
