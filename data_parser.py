@@ -322,11 +322,14 @@ def process_zipped_sets(zipped):
         samples_l.append(l[0]);
         samples_r.append(r[0]);
         if l[1] > r[1]:
-            outputs.append(numpy.array([1, 0, 0]));
+            # left wins
+            outputs.append(numpy.array([1/6]));
         elif l[1] < r[1]:
-            outputs.append(numpy.array([0, 0, 1]));
+            # right wins
+            outputs.append(numpy.array([5/6]));
         else:
-            outputs.append(numpy.array([0, 1, 0]));
+            # draw
+            outputs.append(numpy.array([3/6]));
 
     return (samples_l, samples_r, outputs, diffs);
 

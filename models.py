@@ -472,7 +472,7 @@ class Classifier(Model):
 
         self.weights = tf.Variable(tf.random_normal([input.shape[1].value, outputs]));
         self.biases = tf.Variable(tf.random_normal([outputs]));
-        self.layer = tf.nn.softmax(tf.matmul(input, self.weights) + self.biases);
+        self.layer = tf.nn.sigmoid(tf.matmul(input, self.weights) + self.biases);
         self.output_placeholder = tf.placeholder("float", [None, outputs]);
         self.get_accuracy_tensors();
         
@@ -607,7 +607,7 @@ class Classifier(Model):
         (Tensor, Tensor, Tensor)
             Tuple containing all tensors hold accuracy values
         """
-        correct_prediction = tf.equal(tf.argmax(self.layer, 1), tf.argmax(self.output_placeholder, 1));
+        correct_prediction = tf.less(tf.abs(self.layer - self.output_placeholder), 1/6.0);
 
         self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
         return self.accuracy;
@@ -642,14 +642,14 @@ class Classifier(Model):
         errors = np.repeat(0, 6*14)
         for i in range(0,l):
             # correct answer
-            if (desired_output[i].argmax() == output[i].argmax()):
+            if (abs(desired_output[i][0] - output[i][0]) < (1/6)):
                 correct[diffs[i]] += 1
             # wrong answer
             else:
                 cls = diffs[i]   
                 wrongs[cls] += 1;             
-                expected = desired_output[i].argmax()
-                actual = output[i].argmax()
+                expected = int(desired_output[i][0] * 3)
+                actual = int(output[i][0] * 3)
                 if(expected == 0):
                     actual -= 1;
                 elif (expected == 1):
