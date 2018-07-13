@@ -4,14 +4,14 @@ import sys;
 import tensorflow as tf
 
 # configure here
-TEST_TRUMP = False
-TRAIN_TRUMP = False
-TEST_NO_TRUMP = True
-TRAIN_NO_TRUMP = True
+TEST_TRUMP = True
+TRAIN_TRUMP = True
+TEST_NO_TRUMP = False
+TRAIN_NO_TRUMP = False
 BATCHES = 4
-PARTITION = 0.66
-SET_SIZE = 600000
-EXPERIMENT = "no_trump_l_104_52_13_p104_c_3_detailed_1out"
+PARTITION = 0.5
+SET_SIZE = 200000
+EXPERIMENT = "trump_l_104_52_13_p104_c_3_detailed_1out"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
@@ -72,7 +72,7 @@ a.pretrain(0.001, 0, 1000, data_batches, 0, 0.1, path + "{0}" , optimizer, 0.2, 
 # create classifier
 c = models.Classifier(a, 1);
 # train whole network
-c.train(data_batches_l, data_batches_r, outputs_batches, 0.0001, 15000, 0.0001, path +"/finetuning", samples_l, samples_r, outputs, diffs, test_samples_l, test_samples_r, test_outsputs, test_diffs, dp.suit_count_for_params(TRAIN_NO_TRUMP, TRAIN_TRUMP), dp.suit_count_for_params(TEST_NO_TRUMP, TEST_TRUMP), models.Model.mse_loss, 25, experiment_name);
+c.train(data_batches_l, data_batches_r, outputs_batches, 0.0001, 15000, 0.001, path +"/finetuning", samples_l, samples_r, outputs, diffs, test_samples_l, test_samples_r, test_outsputs, test_diffs, dp.suit_count_for_params(TRAIN_NO_TRUMP, TRAIN_TRUMP), dp.suit_count_for_params(TEST_NO_TRUMP, TEST_TRUMP), models.Model.mse_loss, 25, experiment_name);
 
 # evaluate results
 # print(c.test(data, outputs));
