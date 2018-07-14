@@ -443,7 +443,7 @@ class Classifier(Model):
     autoencoder_r: Autoencoder
     autoencoder_l: Autoencoder
 
-    def __init__(self, autoencoder, outputs):
+    def __init__(self, autoencoder, hidden, outputs):
         """
         Class constructor
 
@@ -469,9 +469,11 @@ class Classifier(Model):
 
         input = tf.concat([input_l, input_r], 1)
         self.session = autoencoder.session;
-
-        self.weights = tf.Variable(tf.random_normal([input.shape[1].value, outputs]));
+        self.weights_hidden = tf.Variable(tf.random_normal([input.shape[1].value, hidden]));
+        self.biases_hidden = tf.Variable(tf.random_normal([hidden]));
+        self.weights = tf.Variable(tf.random_normal([hidden, outputs]));
         self.biases = tf.Variable(tf.random_normal([outputs]));
+        input = tf.nn.sigmoid(tf.matmul(input, self.weights_hidden) + self.biases_hidden);
         self.layer = tf.nn.softmax(tf.matmul(input, self.weights) + self.biases);
         self.output_placeholder = tf.placeholder("float", [None, outputs]);
         self.get_accuracy_tensors();
@@ -542,8 +544,8 @@ class Classifier(Model):
         loss = loss_f(self.output_placeholder, self.layer);
         opt = tf.train.RMSPropOptimizer(learning_rate);
         optimizer = opt.minimize(loss);
-        self.session.run(tf.variables_initializer([self.weights, self.biases]));
-        slot_vars = [self.weights, self.biases] + self.autoencoder_r.weights+ self.autoencoder_l.weights + self.autoencoder_l.biases + self.autoencoder_r.biases;
+        self.session.run(tf.variables_initializer([self.weights, self.biases, self.biases_hidden, self.weights_hidden]));
+        slot_vars = [self.weights, self.biases, self.biases_hidden, self.weights_hidden] + self.autoencoder_r.weights+ self.autoencoder_l.weights + self.autoencoder_l.biases + self.autoencoder_r.biases;
         self.session.run(Model.initialize_optimizer(opt, slot_vars));
         #self.session.run(tf.initialize_all_variables());
         hist_summaries = [(self.autoencoder_l.weights[i], 'weights{0}'.format(i)) for i in range(0, len(self.autoencoder_l.weights))];
