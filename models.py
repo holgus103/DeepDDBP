@@ -506,7 +506,7 @@ class Classifier(Model):
                 s.value.add(tag="{0} - Losses as Wins - difference {1}".format(type, i), simple_value=res[48 + i*6 + 4])   
                 s.value.add(tag="{0} - Losses as Draws - difference {1}".format(type, i), simple_value=res[48 + i*6 + 5])          
             
-            s.value.add(tag="{0} accuracy".format(type), simple_value=res[112])
+            s.value.add(tag="{0} accuracy".format(type), simple_value=res[len(res) - 1])
 
             return s;
 
