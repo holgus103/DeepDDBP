@@ -1,5 +1,6 @@
 import tensorflow as tf;
 import numpy as np;
+import math
 
 class Model:
     """
@@ -484,23 +485,26 @@ class Classifier(Model):
             s.value.add(tag="{0} - Draws - Average win value".format(type), simple_value=res[0])
             s.value.add(tag="{0} - Draws - Average draw value".format(type), simple_value=res[1])
             s.value.add(tag="{0} - Draws - Average loss value".format(type), simple_value=res[2])
+            s.value.add(tag="{0} - Draws - Std win value".format(type), simple_value=res[3])
+            s.value.add(tag="{0} - Draws - Std draw value".format(type), simple_value=res[4])
+            s.value.add(tag="{0} - Draws - Std loss value".format(type), simple_value=res[5])
             # draw class accuracies
             for i in range(0, 14):
-                s.value.add(tag="{0} - Accuracy - difference {1}".format(type, i), simple_value=res[3 + i])
+                s.value.add(tag="{0} - Accuracy - difference {1}".format(type, i), simple_value=res[6 + i])
             # draw corrects
             for i in range(0, 14):
-                s.value.add(tag="{0} - Correct - difference {1}".format(type, i), simple_value=res[17 + i])
+                s.value.add(tag="{0} - Correct - difference {1}".format(type, i), simple_value=res[20 + i])
             # draw wrong
             for i in range(0, 14):
-                s.value.add(tag="{0} - Wrong - difference {1}".format(type, i), simple_value=res[31 + i])
+                s.value.add(tag="{0} - Wrong - difference {1}".format(type, i), simple_value=res[34 + i])
             # draw error propotions for every class
             for i in range(0, 14):
-                s.value.add(tag="{0} - Wins as Draws - difference {1}".format(type, i), simple_value=res[45 + i*6]) 
-                s.value.add(tag="{0} - Wins as Losses - difference {1}".format(type, i), simple_value=res[45 + i*6 + 1])   
-                s.value.add(tag="{0} - Draws as Wins - difference {1}".format(type, i), simple_value=res[45 + i*6 + 2])   
-                s.value.add(tag="{0} - Draws as Losses - difference {1}".format(type, i), simple_value=res[45 + i*6 + 3])   
-                s.value.add(tag="{0} - Losses as Wins - difference {1}".format(type, i), simple_value=res[45 + i*6 + 4])   
-                s.value.add(tag="{0} - Losses as Draws - difference {1}".format(type, i), simple_value=res[45 + i*6 + 5])          
+                s.value.add(tag="{0} - Wins as Draws - difference {1}".format(type, i), simple_value=res[48 + i*6]) 
+                s.value.add(tag="{0} - Wins as Losses - difference {1}".format(type, i), simple_value=res[48 + i*6 + 1])   
+                s.value.add(tag="{0} - Draws as Wins - difference {1}".format(type, i), simple_value=res[48 + i*6 + 2])   
+                s.value.add(tag="{0} - Draws as Losses - difference {1}".format(type, i), simple_value=res[48 + i*6 + 3])   
+                s.value.add(tag="{0} - Losses as Wins - difference {1}".format(type, i), simple_value=res[48 + i*6 + 4])   
+                s.value.add(tag="{0} - Losses as Draws - difference {1}".format(type, i), simple_value=res[48 + i*6 + 5])          
             
             s.value.add(tag="{0} accuracy".format(type), simple_value=res[112])
 
@@ -646,12 +650,16 @@ class Classifier(Model):
         l = len(diffs)
         correct = np.repeat(0, 14);
         wrongs = np.repeat(0, 14);
-        avg_win = 0;
-        avg_draw = 0;
-        avg_loss = 0;
-        draw_cnt = 0
+        avg_win = 0.0;
+        avg_draw = 0.0;
+        avg_loss = 0.0;
+        draw_cnt = 0.0;
+        std_win = 0.0;
+        std_draw = 0.0;
+        std_loss = 0.0;
         # win - losses, draws; draws - wins, losses; losses - wins, draws 
         errors = np.repeat(0, 6*14)
+        # get average outputs for draws
         for i in range(0,l):
             # correct answer
             if(diffs[i] == 0):
@@ -663,6 +671,19 @@ class Classifier(Model):
                 else:
                     avg_win += output[i][0];  
                     avg_loss += output[i][2];
+        avg_win = float(avg_win)/float(draw_cnt);
+        avg_draw = float(avg_draw)/float(draw_cnt);
+        avg_loss = float(avg_loss)/float(draw_cnt);
+        for i in range(0,l):
+            # correct answer
+            if(diffs[i] == 0):
+                std_draw += (output[i][1] - avg_draw) * (output[i][1] - avg_draw);
+                if(desired_output[i].argmax() == 2):
+                    std_win += (output[i][2] - avg_win) * (output[i][2] - avg_win);
+                    std_loss += (output[i][0] - avg_loss) * (output[i][0] - avg_loss);
+                else:
+                    std_win += (output[i][0] - avg_win) * (output[i][0] - avg_win);  
+                    std_loss += (output[i][2] - avg_loss) * (output[i][2] - avg_loss);
 
             if (desired_output[i].argmax() == output[i].argmax()):
                 correct[diffs[i]] += 1;
@@ -683,7 +704,9 @@ class Classifier(Model):
         w_sum = np.sum(wrongs) or 1;
         w_normalized = [(float(i)/float(w_sum)) for i in wrongs];
         # write average output vals for draws
-        res.extend([float(avg_win)/float(draw_cnt), float(avg_draw)/float(draw_cnt), float(avg_loss)/ float(draw_cnt)])
+        res.extend([avg_win, avg_draw, avg_loss])
+        # calculate standard deviation
+        res.extend([math.sqrt(std_win / draw_cnt), math.sqrt(std_draw / draw_cnt), math.sqrt(std_loss / draw_cnt)])
         # write class accuracy
         res.extend([float(correct[i])/float((correct[i] + wrongs[i]) or 1) for i in range(0, 13)])
         # write class correct shares
