@@ -10,8 +10,8 @@ TEST_NO_TRUMP = True
 TRAIN_NO_TRUMP = True
 BATCHES = 4
 PARTITION = 0.66
-SET_SIZE = 600000
-EXPERIMENT = "no_trump_l_104_52_13_p104_c_3_detailed"
+SET_SIZE = 600
+EXPERIMENT = "no_trump_l_104_52_13_p104_c_4_redundancy"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
@@ -31,9 +31,9 @@ path = "./summaries/{0}/".format(experiment_name);
 dp.initialize_random(experiment_name);
 
 # import data
-(data, labels, test_data, test_labels) = dp.read_file("./../data/library", SET_SIZE, True, TRAIN_NO_TRUMP, TRAIN_TRUMP, TEST_NO_TRUMP, TEST_TRUMP, PARTITION);
-(samples_l, samples_r, outputs, diffs) = dp.generate_random_pairs(data, labels, len(data));
-(test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_random_pairs(test_data, test_labels, len(data));
+(data, labels, test_data, test_labels) = dp.read_file("./../data/sol100000.txt", SET_SIZE, True, TRAIN_NO_TRUMP, TRAIN_TRUMP, TEST_NO_TRUMP, TEST_TRUMP, PARTITION);
+(samples_l, samples_r, outputs, diffs) = dp.generate_random_pairs(data, labels  , len(data));
+(test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_random_pairs(test_data, test_labels, len(test_data));
 
 # get sample counts
 dp.save_distribution(path, dp.get_distribution(diffs), dp.get_distribution(test_diffs))
@@ -67,10 +67,10 @@ a = models.Autoencoder.build(208, [104, 52, 13], models.Model.cross_entropy_loss
 
 
 # pretrain each layer
-a.pretrain(0.001, 0, 1000, data_batches, 0, 0.1, path + "{0}" , optimizer, 0.2, 15);
+a.pretrain(0.001, 0, 1000, data_batches, 0, 10, path + "{0}" , optimizer, 0.2, 15);
 
 # create classifier
-c = models.Classifier(a, 3);
+c = models.Classifier(a, 4);
 # train whole network
 c.train(data_batches_l, data_batches_r, outputs_batches, 0.0001, 15000, 0.0001, path +"/finetuning", samples_l, samples_r, outputs, diffs, test_samples_l, test_samples_r, test_outsputs, test_diffs, dp.suit_count_for_params(TRAIN_NO_TRUMP, TRAIN_TRUMP), dp.suit_count_for_params(TEST_NO_TRUMP, TEST_TRUMP), models.Model.mse_loss, 25, experiment_name);
 

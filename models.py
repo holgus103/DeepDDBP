@@ -479,22 +479,13 @@ class Classifier(Model):
     def create_train_summary(self, data_l, data_r, output, diffs, test_data_l, test_data_r, test_output, test_diffs):
 
         def draw_whole_set(s, res, type):
+            s.value.add(tag="{0} accuracy".format(type), simple_value=res[0])
+            s.value.add(tag="{0} draw accuracy".format(type), simple_value=res[1])
+            s.value.add(tag="{0} non-draw accuracy".format(type), simple_value=res[2])
+            s.value.add(tag="{0} overall draw and non-draw accuracy".format(type), simple_value=res[3])
             # draw corrects
             for i in range(0, 14):
-                s.value.add(tag="{0} - Correct - difference {1}".format(type, i), simple_value=res[i])
-            # draw wrong
-            for i in range(0, 14):
-                s.value.add(tag="{0} - Wrong - difference {1}".format(type, i), simple_value=res[14 + i])
-            # draw error propotions for every class
-            for i in range(0, 14):
-                s.value.add(tag="{0} - Wins as Draws - difference {1}".format(type, i), simple_value=res[28 + i*6]) 
-                s.value.add(tag="{0} - Wins as Losses - difference {1}".format(type, i), simple_value=res[28 + i*6 + 1])   
-                s.value.add(tag="{0} - Draws as Wins - difference {1}".format(type, i), simple_value=res[28 + i*6 + 2])   
-                s.value.add(tag="{0} - Draws as Losses - difference {1}".format(type, i), simple_value=res[28 + i*6 + 3])   
-                s.value.add(tag="{0} - Losses as Wins - difference {1}".format(type, i), simple_value=res[28 + i*6 + 4])   
-                s.value.add(tag="{0} - Losses as Draws - difference {1}".format(type, i), simple_value=res[28 + i*6 + 5])          
-            
-            s.value.add(tag="{0} accuracy".format(type), simple_value=res[112])
+                s.value.add(tag="{0} - Accuracy for diff {1}".format(type, i), simple_value=res[4+i])
 
             return s;
 
@@ -638,35 +629,47 @@ class Classifier(Model):
         l = len(diffs)
         correct = np.repeat(0, 14);
         wrongs = np.repeat(0, 14);
-        # win - losses, draws; draws - wins, losses; losses - wins, draws 
-        errors = np.repeat(0, 6*14)
+        global_correct = 0;
+        draw_correct = 0;
+        not_draw_correct = 0;
+        draw_count = 0;
         for i in range(0,l):
-            # correct answer
-            if (desired_output[i].argmax() == output[i].argmax()):
-                correct[diffs[i]] += 1
-            # wrong answer
+            # check for draw and not draw match
+            # current sample is a draw
+            if(diffs[i] == 0):
+                draw_count += 1;
+                # if marked correctly increase corresponding counters
+                if(output[i][2] > output[i][3]):
+                    global_correct += 1;
+                    draw_correct += 1;
+                    correct[0] += 1;
+                else:
+                    wrongs[0] += 1;
+            # current sample is not a draw!
             else:
-                cls = diffs[i]   
-                wrongs[cls] += 1;             
-                expected = desired_output[i].argmax()
-                actual = output[i].argmax()
-                if(expected == 0):
-                    actual -= 1;
-                elif (expected == 1):
-                    actual = (actual == 2 and 1 or 0)   
-                errors[cls*6 + expected*2 + actual] += 1;
-        c_sum = np.sum(correct) or 1
-        c_normalized = [(float(i)/float(c_sum)) for i in correct];
-        w_sum = np.sum(wrongs) or 1;
-        w_normalized = [(float(i)/float(w_sum)) for i in wrongs];
-        res.extend(c_normalized);
-        res.extend(w_normalized);
 
-        for i in range(0, 14):
-            s = np.sum(errors[i*6:(i+1)*6]) or 1;
-            res.extend([float(v)/float(s) for v in errors[i*6:(i+1)*6]])
-        acc = self.session.run(self.accuracy, feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
-        res.append(acc);
+                if(output[i][3] > output[i][2]):
+                    not_draw_correct += 1;
+                    desired_res = desired_output[i][0] > desired_output[i][1] and 1 or 2
+                    output_res = output[i][0] >  output[i][1] and 1 or 2
+                    if (desired_res == output_res):
+                        correct[diffs[i]] += 1;
+                        global_correct +=  1;
+                    else:
+                        wrongs[diffs[i]] += 1;
+                else:
+                    wrongs[diffs[i]] += 1;
+        
+        # write accuracy
+        res.append(float(global_correct)/float(len(diffs)))
+        # write draw and non draw accuracy
+        res.append(float(draw_correct)/float(draw_count or 1));
+        res.append(float(not_draw_correct)/float((len(diffs) - draw_count)) or 1);
+        res.append(float(draw_correct + not_draw_correct)/ float(len(diffs)));
+        # add accuracy for every class
+        for i in range(0,14):
+            res.append(float(correct[i])/float((correct[i] + wrongs[i]) or 1));
+
         return res;          
             
 
