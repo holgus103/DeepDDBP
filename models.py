@@ -481,11 +481,9 @@ class Classifier(Model):
         def draw_whole_set(s, res, type):
             s.value.add(tag="{0} accuracy".format(type), simple_value=res[0])
             s.value.add(tag="{0} draw accuracy".format(type), simple_value=res[1])
-            s.value.add(tag="{0} non-draw accuracy".format(type), simple_value=res[2])
-            s.value.add(tag="{0} overall draw and non-draw accuracy".format(type), simple_value=res[3])
             # draw corrects
             for i in range(0, 14):
-                s.value.add(tag="{0} - Accuracy for diff {1}".format(type, i), simple_value=res[4+i])
+                s.value.add(tag="{0} - Accuracy for diff {1}".format(type, i), simple_value=res[2+i])
 
             return s;
 
@@ -603,7 +601,7 @@ class Classifier(Model):
         self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
         return self.accuracy;
         
-    def test(self, data_l, data_r, desired_output, diffs):
+    def test(self, data_l, data_r, desired_output, diffs, margin = 0.1):
         """
         Test method
     
@@ -631,7 +629,6 @@ class Classifier(Model):
         wrongs = np.repeat(0, 14);
         global_correct = 0;
         draw_correct = 0;
-        not_draw_correct = 0;
         draw_count = 0;
         for i in range(0,l):
             # check for draw and not draw match
@@ -639,7 +636,7 @@ class Classifier(Model):
             if(diffs[i] == 0):
                 draw_count += 1;
                 # if marked correctly increase corresponding counters
-                if(output[i][2] > output[i][3]):
+                if(abs(output[i][0] - output[i][1]) < margin):
                     global_correct += 1;
                     draw_correct += 1;
                     correct[0] += 1;
@@ -647,16 +644,11 @@ class Classifier(Model):
                     wrongs[0] += 1;
             # current sample is not a draw!
             else:
-
-                if(output[i][3] > output[i][2]):
-                    not_draw_correct += 1;
-                    desired_res = desired_output[i][0] > desired_output[i][1] and 1 or 2
-                    output_res = output[i][0] >  output[i][1] and 1 or 2
-                    if (desired_res == output_res):
-                        correct[diffs[i]] += 1;
-                        global_correct +=  1;
-                    else:
-                        wrongs[diffs[i]] += 1;
+                desired_res = desired_output[i][0] > desired_output[i][1] and 1 or 2
+                output_res = output[i][0] >  output[i][1] and 1 or 2
+                if (desired_res == output_res):
+                    correct[diffs[i]] += 1;
+                    global_correct +=  1;
                 else:
                     wrongs[diffs[i]] += 1;
         
@@ -664,8 +656,6 @@ class Classifier(Model):
         res.append(float(global_correct)/float(len(diffs)))
         # write draw and non draw accuracy
         res.append(float(draw_correct)/float(draw_count or 1));
-        res.append(float(not_draw_correct)/float((len(diffs) - draw_count)) or 1);
-        res.append(float(draw_correct + not_draw_correct)/ float(len(diffs)));
         # add accuracy for every class
         for i in range(0,14):
             res.append(float(correct[i])/float((correct[i] + wrongs[i]) or 1));
