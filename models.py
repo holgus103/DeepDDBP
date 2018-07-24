@@ -480,10 +480,14 @@ class Classifier(Model):
 
         def draw_whole_set(s, res, type):
             s.value.add(tag="{0} accuracy".format(type), simple_value=res[0])
-            s.value.add(tag="{0} draw accuracy".format(type), simple_value=res[1])
             # draw corrects
             for i in range(0, 14):
-                s.value.add(tag="{0} - Accuracy for diff {1}".format(type, i), simple_value=res[2+i])
+                s.value.add(tag="{0} - Precision - Wins for diff {1}".format(type, i), simple_value=res[6 * i])
+                s.value.add(tag="{0} - Precision - Draws for diff {1}".format(type, i), simple_value=res[6 * i + 1])
+                s.value.add(tag="{0} - Precision - Loss for diff {1}".format(type, i), simple_value=res[6 * i + 2])
+                s.value.add(tag="{0} - Recall - Wins for diff {1}".format(type, i), simple_value=res[6 * i + 3])
+                s.value.add(tag="{0} - Recall - Draws for diff {1}".format(type, i), simple_value=res[6 * i + 4])
+                s.value.add(tag="{0} - Recall - Loss for diff {1}".format(type, i), simple_value=res[6 * i + 5])
 
             return s;
 
@@ -625,40 +629,65 @@ class Classifier(Model):
         res = [];
         output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
         l = len(diffs)
-        correct = np.repeat(0, 14);
-        wrongs = np.repeat(0, 14);
+        tp_win = np.repeat(0, 14);
+        tp_draw = np.repeat(0, 14);
+        tp_loss = np.repeat(0, 14);
+        fn_win = np.repeat(0, 14);
+        fn_draw = np.repeat(0, 14);
+        fn_loss = np.repeat(0, 14);
+        fp_win = np.repeat(0, 14);
+        fp_draw = np.repeat(0, 14);
+        fp_loss = np.repeat(0, 14);
         global_correct = 0;
-        draw_correct = 0;
-        draw_count = 0;
         for i in range(0,l):
-            # check for draw and not draw match
-            # current sample is a draw
-            if(diffs[i] == 0):
-                draw_count += 1;
-                # if marked correctly increase corresponding counters
-                if(abs(output[i][0] - output[i][1]) < margin):
+            r = diffs[i]
+            # check if sample is marked as a draw
+            if(abs(output[i][0] - output[i][1]) < margin):
+                # marked correctly
+                if(r == 0):
+                    tp_draw[r] += 1;
                     global_correct += 1;
-                    draw_correct += 1;
-                    correct[0] += 1;
                 else:
-                    wrongs[0] += 1;
-            # current sample is not a draw!
+                    fp_draw[r] += 1;
+                    if(desired_output[i][0] > desired_output[i][1]):
+                        fn_win[r] += 1;
+                    else:
+                        fn_loss[r] += 1;
+            # is not marked as a draw
             else:
-                desired_res = desired_output[i][0] > desired_output[i][1] and 1 or 2
-                output_res = output[i][0] >  output[i][1] and 1 or 2
-                if (desired_res == output_res):
-                    correct[diffs[i]] += 1;
-                    global_correct +=  1;
+                # if marked as win
+                if(output[i][0] > output[i][1]):
+                    if(desired_output[i][0] > desired_output[i][1]):
+                        tp_win[r] += 1;
+                        global_correct += 1;
+                    elif(r == 0):
+                        fp_win[r] += 1;
+                        fn_draw[r] += 1;
+                    else:
+                        fp_win[r] += 1;
+                        fn_loss[r] += 1;
                 else:
-                    wrongs[diffs[i]] += 1;
+                    if(desired_output[i][0] < desired_output[i][1]):
+                        tp_loss[r] += 1;
+                        global_correct += 1;
+                    elif(r == 0):
+                        fp_loss[r] += 1;
+                        fn_draw[r] += 1;
+                    else:
+                        fp_loss[r] += 1;
+                        fn_win[r] += 1;
+
+
         
         # write accuracy
         res.append(float(global_correct)/float(len(diffs)))
-        # write draw and non draw accuracy
-        res.append(float(draw_correct)/float(draw_count or 1));
-        # add accuracy for every class
         for i in range(0,14):
-            res.append(float(correct[i])/float((correct[i] + wrongs[i]) or 1));
+            res.append(float(tp_win[i]) / (float(tp_win[i] + fp_win[i]) or 1))
+            res.append(float(tp_draw[i]) / (float(tp_draw[i] + fp_draw[i]) or 1))
+            res.append(float(tp_loss[i]) / (float(tp_loss[i] + fp_loss[i]) or 1))
+            res.append(float(tp_win[i]) / (float(tp_win[i] + fn_win[i]) or 1))
+            res.append(float(tp_draw[i]) / (float(tp_draw[i] + fn_draw[i]) or 1))
+            res.append(float(tp_loss[i]) / (float(tp_loss[i] + fn_loss[i]) or 1))
 
         return res;          
             
