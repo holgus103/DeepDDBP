@@ -657,22 +657,22 @@ class Classifier(Model):
             else:
                 # if marked as win
                 if(output[i][0] > output[i][1]):
-                    if(desired_output[i][0] > desired_output[i][1]):
-                        tp_win[r] += 1;
-                        global_correct += 1;
-                    elif(r == 0):
+                    if(r == 0):
                         fp_win[r] += 1;
                         fn_draw[r] += 1;
+                    elif(desired_output[i][0] > desired_output[i][1]):
+                        tp_win[r] += 1;
+                        global_correct += 1;
                     else:
                         fp_win[r] += 1;
                         fn_loss[r] += 1;
                 else:
-                    if(desired_output[i][0] < desired_output[i][1]):
-                        tp_loss[r] += 1;
-                        global_correct += 1;
-                    elif(r == 0):
+                    if(r == 0):
                         fp_loss[r] += 1;
                         fn_draw[r] += 1;
+                    elif(desired_output[i][0] < desired_output[i][1]):
+                        tp_loss[r] += 1;
+                        global_correct += 1;
                     else:
                         fp_loss[r] += 1;
                         fn_win[r] += 1;
