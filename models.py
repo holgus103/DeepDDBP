@@ -482,12 +482,12 @@ class Classifier(Model):
             s.value.add(tag="{0} accuracy".format(type), simple_value=res[0])
             # draw corrects
             for i in range(0, 14):
-                s.value.add(tag="{0} - Precision - Wins for diff {1}".format(type, i), simple_value=res[6 * i])
-                s.value.add(tag="{0} - Precision - Draws for diff {1}".format(type, i), simple_value=res[6 * i + 1])
-                s.value.add(tag="{0} - Precision - Loss for diff {1}".format(type, i), simple_value=res[6 * i + 2])
-                s.value.add(tag="{0} - Recall - Wins for diff {1}".format(type, i), simple_value=res[6 * i + 3])
-                s.value.add(tag="{0} - Recall - Draws for diff {1}".format(type, i), simple_value=res[6 * i + 4])
-                s.value.add(tag="{0} - Recall - Loss for diff {1}".format(type, i), simple_value=res[6 * i + 5])
+                s.value.add(tag="{0} - Precision - Wins for diff {1}".format(type, i), simple_value=res[1 + 6 * i])
+                s.value.add(tag="{0} - Precision - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 1])
+                s.value.add(tag="{0} - Precision - Loss for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 2])
+                s.value.add(tag="{0} - Recall - Wins for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 3])
+                s.value.add(tag="{0} - Recall - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 4])
+                s.value.add(tag="{0} - Recall - Loss for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 5])
 
             return s;
 
