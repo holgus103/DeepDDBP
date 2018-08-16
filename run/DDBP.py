@@ -10,8 +10,8 @@ TEST_NO_TRUMP = True
 TRAIN_NO_TRUMP = True
 BATCHES = 4
 PARTITION = 0.66
-SET_SIZE = 600000
-EXPERIMENT = "no_trump_l_104_52_13_p104_c_2_detailed_margin0.4"
+SET_SIZE = 600
+EXPERIMENT = "no_trump_l_104_52_13_p104_c_2balanced_margin0.1"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
@@ -32,8 +32,8 @@ dp.initialize_random(experiment_name);
 
 # import data
 (data, labels, test_data, test_labels) = dp.read_file("./../data/library", SET_SIZE, True, TRAIN_NO_TRUMP, TRAIN_TRUMP, TEST_NO_TRUMP, TEST_TRUMP, PARTITION);
-(samples_l, samples_r, outputs, diffs) = dp.generate_random_pairs(data, labels  , len(data));
-(test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_random_pairs(test_data, test_labels, len(test_data));
+(samples_l, samples_r, outputs, diffs) = dp.generate_balanced_classes(data, labels, 133, 133, 133);
+(test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_balanced_classes(test_data, test_labels, 66, 66, 66);
 
 # get sample counts
 dp.save_distribution(path, dp.get_distribution(diffs), dp.get_distribution(test_diffs))

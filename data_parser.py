@@ -332,7 +332,7 @@ def process_zipped_sets(zipped):
 
 def generate_random_pairs(data, labels, count):
     input = list(zip(data, labels))
-    left = random.sample(list(input), count);
+    left = random.sample(input, count);
     right = random.sample(input, count); 
     return process_zipped_sets(zip(left, right));
 
@@ -342,6 +342,41 @@ def generate_random_pair_for_samples(data, labels):
     input = list(zip(data, labels));
     right = random.sample(input, count); 
     return process_zipped_sets(zip(input, right));
+
+def generate_balanced_classes(data, labels, lefts, draws, rights):
+    input = list(zip(data, labels))
+    samples_r = [];
+    samples_l = [];
+    outputs = [];
+    diffs = [];
+    while lefts > 0 or rights > 0 or draws > 0:
+        d = random.sample(input, 2);
+        l = d[0];
+        r = d[1];
+        if l[1] > r[1] and lefts > 0:
+            lefts -= 1;
+            samples_l.append(l[0]);
+            samples_r.append(r[0]);
+            diffs.append(abs(l[1] - r[1]));
+            outputs.append(numpy.array([1, 0]));
+        elif l[1] < r[1] and rights > 0:
+            rights -= 1;
+            samples_l.append(l[0]);
+            samples_r.append(r[0]);
+            diffs.append(abs(l[1] - r[1]));
+            outputs.append(numpy.array([0, 1]));
+        else:
+            if l[1] == r[1] and draws > 0:
+                draws -= 1;
+                samples_l.append(l[0]);
+                samples_r.append(r[0]);
+                diffs.append(abs(l[1] - r[1]));
+                outputs.append(numpy.array([0.5, 0.5]));
+    return (samples_l, samples_r, outputs, diffs);
+            
+
+         
+
       
 
 def initialize_random(name):
@@ -362,3 +397,4 @@ def suit_count_for_params(no_trump, trump):
     if(trump):
         acc = acc + 4;
     return acc;
+
