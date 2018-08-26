@@ -605,7 +605,7 @@ class Classifier(Model):
         self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
         return self.accuracy;
         
-    def test(self, data_l, data_r, desired_output, diffs, margin = 0.1):
+    def test(self, data_l, data_r, desired_output, diffs, margin = 0.2):
         """
         Test method
     
