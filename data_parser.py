@@ -404,3 +404,18 @@ def suit_count_for_params(no_trump, trump):
         acc = acc + 4;
     return acc;
 
+def labeled_dictionary(samples, labels):
+    d = {}
+    for v in range(0, len(samples)):
+        if(not labels[v] in d):
+            d[labels[v]] = [];
+        d[labels[v]].append([samples[v]]);
+    return d;
+
+def get_output_for_pair(left, right):
+    if(left == right):
+        return [0.5, 0.5];
+    elif(left < right)
+        return [0, 1];
+    else:
+        return [1, 0];

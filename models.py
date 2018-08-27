@@ -1,5 +1,7 @@
 import tensorflow as tf;
 import numpy as np;
+import math;
+import data_parser as dp;
 
 class Model:
     """
@@ -752,3 +754,35 @@ class Classifier(Model):
             res.append(self.suit_based_accurancy(data_batches[i], outputs_batches[i], suits));
 
         return ([sum(z)/batch_count for x in list(zip(*res)) for z in zip(*x)], res);
+
+    def classify_dichotomy(self, sample, comparables, margin = 0.2, start, end, output):
+        if(start >= end)
+            return end;
+        middle = math.ceil((end - start) / 2.0)
+        sevens = comparables[middle];
+        c = len(comparables);
+        val = dp.get_output_for_pair(output, middle);
+        desired_outputs = [val] * c;
+        samples = [sample] * c;
+        output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: sevens, self.output_placeholder: desired_output});
+        sevens_output = [sum(x)/c for x in zip(*C)]
+        if(abs(sevens_output[0] - sevens_output[1]) < margin):
+             return middle;
+        elif(sevens_output[0] < sevens_output[1]):
+            self.classify_dichotomy(sample, comparables, margin, start, middle - 1);
+        else:
+            self.classify_dichotomy(sample, comparables, margin, middle + 1, end);
+
+    def classify_sequential(self, sample, compatables, output):
+        for i in range(0, 14):
+            val = dp.get_output_for_pair(output, i);
+            desired_outputs = [val] * c
+            c = len(comparables);
+            samples = [sample] * c;
+            output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: comparables[i], self.output_placeholder: desired_output});
+        
+
+
+
+            
+
