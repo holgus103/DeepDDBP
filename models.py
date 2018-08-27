@@ -482,31 +482,15 @@ class Classifier(Model):
     def create_train_summary(self, data_l, data_r, output, diffs, test_data_l, test_data_r, test_output, test_diffs):
 
         def draw_whole_set(s, res, type):
-            s.value.add(tag="{0} - Draws - Average win value".format(type), simple_value=res[0])
-            s.value.add(tag="{0} - Draws - Average draw value".format(type), simple_value=res[1])
-            s.value.add(tag="{0} - Draws - Average loss value".format(type), simple_value=res[2])
-            s.value.add(tag="{0} - Draws - Std win value".format(type), simple_value=res[3])
-            s.value.add(tag="{0} - Draws - Std draw value".format(type), simple_value=res[4])
-            s.value.add(tag="{0} - Draws - Std loss value".format(type), simple_value=res[5])
-            # draw class accuracies
-            for i in range(0, 14):
-                s.value.add(tag="{0} - Accuracy - difference {1}".format(type, i), simple_value=res[6 + i])
+            s.value.add(tag="{0} accuracy".format(type), simple_value=res[0])
             # draw corrects
             for i in range(0, 14):
-                s.value.add(tag="{0} - Correct - difference {1}".format(type, i), simple_value=res[20 + i])
-            # draw wrong
-            for i in range(0, 14):
-                s.value.add(tag="{0} - Wrong - difference {1}".format(type, i), simple_value=res[34 + i])
-            # draw error propotions for every class
-            for i in range(0, 14):
-                s.value.add(tag="{0} - Wins as Draws - difference {1}".format(type, i), simple_value=res[48 + i*6]) 
-                s.value.add(tag="{0} - Wins as Losses - difference {1}".format(type, i), simple_value=res[48 + i*6 + 1])   
-                s.value.add(tag="{0} - Draws as Wins - difference {1}".format(type, i), simple_value=res[48 + i*6 + 2])   
-                s.value.add(tag="{0} - Draws as Losses - difference {1}".format(type, i), simple_value=res[48 + i*6 + 3])   
-                s.value.add(tag="{0} - Losses as Wins - difference {1}".format(type, i), simple_value=res[48 + i*6 + 4])   
-                s.value.add(tag="{0} - Losses as Draws - difference {1}".format(type, i), simple_value=res[48 + i*6 + 5])          
-            
-            s.value.add(tag="{0} accuracy".format(type), simple_value=res[len(res) - 1])
+                s.value.add(tag="{0} - Precision - Wins for diff {1}".format(type, i), simple_value=res[1 + 6 * i])
+                s.value.add(tag="{0} - Precision - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 1])
+                s.value.add(tag="{0} - Precision - Loss for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 2])
+                s.value.add(tag="{0} - Recall - Wins for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 3])
+                s.value.add(tag="{0} - Recall - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 4])
+                s.value.add(tag="{0} - Recall - Loss for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 5])
 
             return s;
 
@@ -632,7 +616,6 @@ class Classifier(Model):
             - Exact deal match percentage
             - Actual deal missed by 1 percentage
             - Actual deal missed by 2 percentage
-
         Parameters
         ----------
         self : Classifier 
@@ -648,79 +631,67 @@ class Classifier(Model):
         res = [];
         output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
         l = len(diffs)
-        correct = np.repeat(0, 14);
-        wrongs = np.repeat(0, 14);
-        avg_win = 0.0;
-        avg_draw = 0.0;
-        avg_loss = 0.0;
-        draw_cnt = 0.0;
-        std_win = 0.0;
-        std_draw = 0.0;
-        std_loss = 0.0;
-        # win - losses, draws; draws - wins, losses; losses - wins, draws 
-        errors = np.repeat(0, 6*14)
-        # get average outputs for draws
+        tp_win = np.repeat(0, 14);
+        tp_draw = np.repeat(0, 14);
+        tp_loss = np.repeat(0, 14);
+        fn_win = np.repeat(0, 14);
+        fn_draw = np.repeat(0, 14);
+        fn_loss = np.repeat(0, 14);
+        fp_win = np.repeat(0, 14);
+        fp_draw = np.repeat(0, 14);
+        fp_loss = np.repeat(0, 14);
+        global_correct = 0;
         for i in range(0,l):
-            # correct answer
-            if(diffs[i] == 0):
-                draw_cnt += 1;
-                avg_draw += output[i][1];
-                if(desired_output[i].argmax() == 2):
-                    avg_win += output[i][2];
-                    avg_loss += output[i][0];
+            r = diffs[i]
+            # check if sample is marked as a draw
+            if(output[i].argmax() == 1):
+                # marked correctly
+                if(r == 0):
+                    tp_draw[r] += 1;
+                    global_correct += 1;
                 else:
-                    avg_win += output[i][0];  
-                    avg_loss += output[i][2];
-        avg_win = float(avg_win)/float(draw_cnt);
-        avg_draw = float(avg_draw)/float(draw_cnt);
-        avg_loss = float(avg_loss)/float(draw_cnt);
-        for i in range(0,l):
-            # correct answer
-            if(diffs[i] == 0):
-                std_draw += (output[i][1] - avg_draw) * (output[i][1] - avg_draw);
-                if(desired_output[i].argmax() == 2):
-                    std_win += (output[i][2] - avg_win) * (output[i][2] - avg_win);
-                    std_loss += (output[i][0] - avg_loss) * (output[i][0] - avg_loss);
-                else:
-                    std_win += (output[i][0] - avg_win) * (output[i][0] - avg_win);  
-                    std_loss += (output[i][2] - avg_loss) * (output[i][2] - avg_loss);
-
-            if (desired_output[i].argmax() == output[i].argmax()):
-                correct[diffs[i]] += 1;
-            # wrong answer
+                    fp_draw[r] += 1;
+                    if(desired_output[i][0] > desired_output[i][2]):
+                        fn_win[r] += 1;
+                    else:
+                        fn_loss[r] += 1;
+            # is not marked as a draw
             else:
-                cls = diffs[i]   
-                wrongs[cls] += 1;             
-                expected = desired_output[i].argmax()
-                actual = output[i].argmax()
-                if(expected == 0):
-                    actual -= 1;
-                elif (expected == 1):
-                    actual = (actual == 2 and 1 or 0)   
-                errors[cls*6 + expected*2 + actual] += 1;
+                # if marked as win
+                if(output[i].argmax() == 0):
+                    if(r == 0):
+                        fp_win[r] += 1;
+                        fn_draw[r] += 1;
+                    elif(desired_output[i][0] > desired_output[i][2]):
+                        tp_win[r] += 1;
+                        global_correct += 1;
+                    else:
+                        fp_win[r] += 1;
+                        fn_loss[r] += 1;
+                else:
+                    if(r == 0):
+                        fp_loss[r] += 1;
+                        fn_draw[r] += 1;
+                    elif(desired_output[i][0] < desired_output[i][2]):
+                        tp_loss[r] += 1;
+                        global_correct += 1;
+                    else:
+                        fp_loss[r] += 1;
+                        fn_win[r] += 1;
 
-        c_sum = np.sum(correct) or 1;
-        c_normalized = [(float(i)/float(c_sum)) for i in correct];
-        w_sum = np.sum(wrongs) or 1;
-        w_normalized = [(float(i)/float(w_sum)) for i in wrongs];
-        # write average output vals for draws
-        res.extend([avg_win, avg_draw, avg_loss])
-        # calculate standard deviation
-        res.extend([math.sqrt(std_win / draw_cnt), math.sqrt(std_draw / draw_cnt), math.sqrt(std_loss / draw_cnt)])
-        # write class accuracy
-        res.extend([float(correct[i])/float((correct[i] + wrongs[i]) or 1) for i in range(0, 13)])
-        # write class correct shares
-        res.extend(c_normalized);
-        # write class wrong shares
-        res.extend(w_normalized);
-        # for every class
-        for i in range(0, 14):
-            s = np.sum(errors[i*6:(i+1)*6]) or 1;
-            # write error type shares
-            res.extend([float(v)/float(s) for v in errors[i*6:(i+1)*6]])
-        acc = self.session.run(self.accuracy, feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
-        res.append(acc);
-        return res;          
+
+        
+        # write accuracy
+        res.append(float(global_correct)/float(len(diffs)))
+        for i in range(0,14):
+            res.append(float(tp_win[i]) / (float(tp_win[i] + fp_win[i]) or 1))
+            res.append(float(tp_draw[i]) / (float(tp_draw[i] + fp_draw[i]) or 1))
+            res.append(float(tp_loss[i]) / (float(tp_loss[i] + fp_loss[i]) or 1))
+            res.append(float(tp_win[i]) / (float(tp_win[i] + fn_win[i]) or 1))
+            res.append(float(tp_draw[i]) / (float(tp_draw[i] + fn_draw[i]) or 1))
+            res.append(float(tp_loss[i]) / (float(tp_loss[i] + fn_loss[i]) or 1))
+
+        return res;        
             
 
     def save_model(self, name):
