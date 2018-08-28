@@ -482,14 +482,13 @@ class Classifier(Model):
 
         def draw_whole_set(s, res, type):
             s.value.add(tag="{0} accuracy".format(type), simple_value=res[0])
+            s.value.add(tag="{0} - Precision - Draws".format(type), simple_value=res[1])
+            s.value.add(tag="{0} - Recall - Draws".format(type), simple_value=res[2])
             # draw corrects
             for i in range(0, 14):
-                s.value.add(tag="{0} - Precision - Wins for diff {1}".format(type, i), simple_value=res[1 + 6 * i])
-                s.value.add(tag="{0} - Precision - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 1])
-                s.value.add(tag="{0} - Precision - Loss for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 2])
-                s.value.add(tag="{0} - Recall - Wins for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 3])
-                s.value.add(tag="{0} - Recall - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 4])
-                s.value.add(tag="{0} - Recall - Loss for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 5])
+
+                s.value.add(tag="{0} - Precision - Nondraws for diff {1}".format(type, i), simple_value=res[2 + 2 * i])
+                s.value.add(tag="{0} - Recall - Nondraws for diff {1}".format(type, i), simple_value=res[2 + 2 * i + 1])
 
             return s;
 
@@ -631,65 +630,43 @@ class Classifier(Model):
         res = [];
         output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
         l = len(diffs)
-        tp_win = np.repeat(0, 14);
-        tp_draw = np.repeat(0, 14);
-        tp_loss = np.repeat(0, 14);
-        fn_win = np.repeat(0, 14);
-        fn_draw = np.repeat(0, 14);
-        fn_loss = np.repeat(0, 14);
-        fp_win = np.repeat(0, 14);
-        fp_draw = np.repeat(0, 14);
-        fp_loss = np.repeat(0, 14);
+        tp_nondraws = np.repeat(0, 14);
+        tp_draw = 0
+        fn_nondraws = np.repeat(0, 14);
+        fn_draw = 0
+        fp_nondraws = np.repeat(0, 14);
+        fp_draw = 0
         global_correct = 0;
         for i in range(0,l):
             r = diffs[i]
             # check if sample is marked as a draw
-            if(abs(output[i][0] - output[i][1]) < margin):
+            if(output[i][0] < output[i][1]):
                 # marked correctly
                 if(r == 0):
-                    tp_draw[r] += 1;
+                    tp_draw += 1;
                     global_correct += 1;
                 else:
-                    fp_draw[r] += 1;
-                    if(desired_output[i][0] > desired_output[i][1]):
-                        fn_win[r] += 1;
-                    else:
-                        fn_loss[r] += 1;
+                    fp_draw += 1;
+                    fn_nondraws[r] += 1;
             # is not marked as a draw
             else:
-                # if marked as win
-                if(output[i][0] > output[i][1]):
-                    if(r == 0):
-                        fp_win[r] += 1;
-                        fn_draw[r] += 1;
-                    elif(desired_output[i][0] > desired_output[i][1]):
-                        tp_win[r] += 1;
-                        global_correct += 1;
-                    else:
-                        fp_win[r] += 1;
-                        fn_loss[r] += 1;
+                if(r == 0):
+                    fp_nondraws[r] += 1;
+                    fn_draw += 1;
                 else:
-                    if(r == 0):
-                        fp_loss[r] += 1;
-                        fn_draw[r] += 1;
-                    elif(desired_output[i][0] < desired_output[i][1]):
-                        tp_loss[r] += 1;
-                        global_correct += 1;
-                    else:
-                        fp_loss[r] += 1;
-                        fn_win[r] += 1;
+                    tp_nondraws[r] += 1;
+                    global_correct += 1;
 
 
         
         # write accuracy
         res.append(float(global_correct)/float(len(diffs)))
+        res.append(float(tp_draw) / (float(tp_draw + fp_draw) or 1))
+        res.append(float(tp_draw) / (float(tp_draw + fn_draw) or 1))
         for i in range(0,14):
-            res.append(float(tp_win[i]) / (float(tp_win[i] + fp_win[i]) or 1))
-            res.append(float(tp_draw[i]) / (float(tp_draw[i] + fp_draw[i]) or 1))
-            res.append(float(tp_loss[i]) / (float(tp_loss[i] + fp_loss[i]) or 1))
-            res.append(float(tp_win[i]) / (float(tp_win[i] + fn_win[i]) or 1))
-            res.append(float(tp_draw[i]) / (float(tp_draw[i] + fn_draw[i]) or 1))
-            res.append(float(tp_loss[i]) / (float(tp_loss[i] + fn_loss[i]) or 1))
+            res.append(float(tp_nondraws[i]) / (float(tp_nondraws[i] + fp_nondraws[i]) or 1))
+            res.append(float(tp_nondraws[i]) / (float(tp_nondraws[i] + fn_nondraws[i]) or 1))
+
 
         return res;          
             
@@ -755,8 +732,8 @@ class Classifier(Model):
 
         return ([sum(z)/batch_count for x in list(zip(*res)) for z in zip(*x)], res);
 
-    def classify_dichotomy(self, sample, comparables, margin = 0.2, start, end, output):
-        if(start >= end)
+    def classify_dichotomy(self, sample, comparables, margin, start, end, output):
+        if(start >= end):
             return end;
         middle = math.ceil((end - start) / 2.0)
         sevens = comparables[middle];

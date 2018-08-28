@@ -324,9 +324,9 @@ def process_zipped_sets(zipped):
         if l[1] > r[1]:
             outputs.append(numpy.array([1, 0]));
         elif l[1] < r[1]:
-            outputs.append(numpy.array([0, 1]));
+            outputs.append(numpy.array([1, 0]));
         else:
-            outputs.append(numpy.array([0.5, 0.5]));
+            outputs.append(numpy.array([0, 1]));
 
     return (samples_l, samples_r, outputs, diffs);
 
@@ -368,7 +368,7 @@ def generate_balanced_classes(data, labels, lefts, draws, rights):
             samples_l.append(l[0]);
             samples_r.append(r[0]);
             diffs.append(abs(l[1] - r[1]));
-            outputs.append(numpy.array([0, 1]));
+            outputs.append(numpy.array([1, 0]));
             c += 1;
         else:
             if l[1] == r[1] and draws > 0:
@@ -376,7 +376,7 @@ def generate_balanced_classes(data, labels, lefts, draws, rights):
                 samples_l.append(l[0]);
                 samples_r.append(r[0]);
                 diffs.append(abs(l[1] - r[1]));
-                outputs.append(numpy.array([0.5, 0.5]));
+                outputs.append(numpy.array([0, 1]));
                 c += 1;
     return (samples_l, samples_r, outputs, diffs);
             
@@ -414,8 +414,8 @@ def labeled_dictionary(samples, labels):
 
 def get_output_for_pair(left, right):
     if(left == right):
-        return [0.5, 0.5];
-    elif(left < right)
         return [0, 1];
+    elif(left < right):
+        return [1, 0];
     else:
         return [1, 0];
