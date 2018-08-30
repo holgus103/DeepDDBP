@@ -485,10 +485,10 @@ class Classifier(Model):
             s.value.add(tag="{0} - Precision - Draws".format(type), simple_value=res[1])
             s.value.add(tag="{0} - Recall - Draws".format(type), simple_value=res[2])
             # draw corrects
-            for i in range(0, 14):
-
-                s.value.add(tag="{0} - Precision - Nondraws for diff {1}".format(type, i), simple_value=res[2 + 2 * i])
-                s.value.add(tag="{0} - Recall - Nondraws for diff {1}".format(type, i), simple_value=res[2 + 2 * i + 1])
+            s.value.add(tag="{0} - Precision - Nondraws".format(type), simple_value=res[3])
+            s.value.add(tag="{0} - Recall - Nondraws".format(type), simple_value=res[4])
+            s.value.add(tag="{0} - Acc TF".format(type), simple_value=res[5])
+    
 
             return s;
 
@@ -628,13 +628,13 @@ class Classifier(Model):
         Detailed accurancy concerning the current model
         """
         res = [];
-        output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
+        [output, acc] = self.session.run([self.layer, self.accuracy], feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
         l = len(diffs)
-        tp_nondraws = np.repeat(0, 14);
+        tp_nondraws = 0;
         tp_draw = 0
-        fn_nondraws = np.repeat(0, 14);
+        fn_nondraws = 0;
         fn_draw = 0
-        fp_nondraws = np.repeat(0, 14);
+        fp_nondraws = 0;
         fp_draw = 0
         global_correct = 0;
         for i in range(0,l):
@@ -647,14 +647,14 @@ class Classifier(Model):
                     global_correct += 1;
                 else:
                     fp_draw += 1;
-                    fn_nondraws[r] += 1;
+                    fn_nondraws += 1;
             # is not marked as a draw
             else:
                 if(r == 0):
-                    fp_nondraws[r] += 1;
+                    fp_nondraws += 1;
                     fn_draw += 1;
                 else:
-                    tp_nondraws[r] += 1;
+                    tp_nondraws += 1;
                     global_correct += 1;
 
 
@@ -663,9 +663,9 @@ class Classifier(Model):
         res.append(float(global_correct)/float(len(diffs)))
         res.append(float(tp_draw) / (float(tp_draw + fp_draw) or 1))
         res.append(float(tp_draw) / (float(tp_draw + fn_draw) or 1))
-        for i in range(0,14):
-            res.append(float(tp_nondraws[i]) / (float(tp_nondraws[i] + fp_nondraws[i]) or 1))
-            res.append(float(tp_nondraws[i]) / (float(tp_nondraws[i] + fn_nondraws[i]) or 1))
+        res.append(float(tp_nondraws) / (float(tp_nondraws + fp_nondraws) or 1))
+        res.append(float(tp_nondraws) / (float(tp_nondraws + fn_nondraws) or 1))
+        res.append(acc)
 
 
         return res;          
@@ -757,6 +757,9 @@ class Classifier(Model):
             c = len(comparables);
             samples = [sample] * c;
             output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: comparables[i], self.output_placeholder: desired_output});
+
+
+        
         
 
 
