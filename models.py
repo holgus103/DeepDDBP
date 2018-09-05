@@ -478,7 +478,7 @@ class Classifier(Model):
         self.output_placeholder = tf.placeholder("float", [None, outputs]);
         self.get_accuracy_tensors();
         
-    def create_train_summary(self, data_l, data_r, output, diffs, test_data_l, test_data_r, test_output, test_diffs):
+    def create_train_summary(self, data_l, data_r, output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels, d):
 
         def draw_whole_set(s, res, type):
             s.value.add(tag="{0} accuracy".format(type), simple_value=res[0])
@@ -490,20 +490,20 @@ class Classifier(Model):
                 s.value.add(tag="{0} - Recall - Wins for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 3])
                 s.value.add(tag="{0} - Recall - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 4])
                 s.value.add(tag="{0} - Recall - Loss for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 5])
-
+            s.value.add(tag="{0} - Dichotomy accuracy".format(type), simple_value=res[1+ 13*6+6])
             return s;
 
     
         s = tf.Summary();
-        r_tr = self.test(data_l, data_r, output, diffs);
-        r_test = self.test(test_data_l, test_data_r, test_output, test_diffs);
+        r_tr = self.test(data_l, data_r, output, diffs, data, labels, d);
+        r_test = self.test(test_data_l, test_data_r, test_output, test_diffs, test_data, test_labels, d);
         s = draw_whole_set(s, r_tr, "Train");
         s = draw_whole_set(s, r_test, "Test");
 
 
         return s;
 
-    def train(self, data_l, data_r, desired_output, learning_rate, it, delta, path, train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs, train_suits = 5, test_suits = 5, loss_f = Model.mse_loss, no_improvement = 5, experiment_name = ""):
+    def train(self, data_l, data_r, desired_output, learning_rate, it, delta, path, train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels, train_suits = 5, test_suits = 5, loss_f = Model.mse_loss, no_improvement = 5, experiment_name = ""):
         """
         Main train method
     
@@ -548,8 +548,8 @@ class Classifier(Model):
         summary_op = tf.summary.merge(summaries);
 
         writer = tf.summary.FileWriter(path, graph=self.autoencoder_l.session.graph)
-
-
+    
+        d = dp.labeled_dictionary(data, labels);
         if delta > 0:
             prev_val = 0;
             current_val = 0;
@@ -559,7 +559,7 @@ class Classifier(Model):
                 for k in range(0, len(data_r)):
                     lval, _, summary = self.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder_l: data_l[k], self.input_placeholder_r: data_r[k], self.output_placeholder: desired_output[k]});
                 if it_counter % 100 == 0:
-                    s = self.create_train_summary(train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs);
+                    s = self.create_train_summary(train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels, d);
                     #current_val = self.test(test_data_l, test_data_r, test_output)[0];
                     #print(current_val);
                     self.save_model(experiment_name + " at {0}".format(it_counter))
@@ -607,7 +607,7 @@ class Classifier(Model):
         self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
         return self.accuracy;
         
-    def test(self, data_l, data_r, desired_output, diffs, margin = 0.2):
+    def test(self, data_l, data_r, desired_output, diffs, data, labels, d, margin = 0.2):
         """
         Test method
     
@@ -690,6 +690,8 @@ class Classifier(Model):
             res.append(float(tp_win[i]) / (float(tp_win[i] + fn_win[i]) or 1))
             res.append(float(tp_draw[i]) / (float(tp_draw[i] + fn_draw[i]) or 1))
             res.append(float(tp_loss[i]) / (float(tp_loss[i] + fn_loss[i]) or 1))
+        res.append(self.classify_dichotomy_set(data, labels, d));
+        
 
         return res;          
             
@@ -755,23 +757,30 @@ class Classifier(Model):
 
         return ([sum(z)/batch_count for x in list(zip(*res)) for z in zip(*x)], res);
 
-    def classify_dichotomy(self, sample, comparables, margin = 0.2, start, end, output):
-        if(start >= end)
+    def classify_dichotomy(self, sample, comparables, margin, start, end, output):
+        if(start >= end):
             return end;
-        middle = math.ceil((end - start) / 2.0)
+
+        middle = math.ceil((float(end) + float(start)) / 2.0)
+        #print(start)
+        #print(middle)
+        #print(end)
         sevens = comparables[middle];
-        c = len(comparables);
+        c = len(sevens);
         val = dp.get_output_for_pair(output, middle);
-        desired_outputs = [val] * c;
+        desired_output = [val] * c;
         samples = [sample] * c;
-        output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: sevens, self.output_placeholder: desired_output});
-        sevens_output = [sum(x)/c for x in zip(*C)]
+        #print(len(samples))
+        o = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: sevens, self.output_placeholder: desired_output});
+        sevens_output = [sum(x)/c for x in zip(*o)]
         if(abs(sevens_output[0] - sevens_output[1]) < margin):
              return middle;
         elif(sevens_output[0] < sevens_output[1]):
-            self.classify_dichotomy(sample, comparables, margin, start, middle - 1);
+            #print("right")
+            return self.classify_dichotomy(sample, comparables, margin, start, middle - 1, output);
         else:
-            self.classify_dichotomy(sample, comparables, margin, middle + 1, end);
+            #print("left")
+            return self.classify_dichotomy(sample, comparables, margin, middle + 1, end, output);
 
     def classify_sequential(self, sample, compatables, output):
         for i in range(0, 14):
@@ -780,6 +789,17 @@ class Classifier(Model):
             c = len(comparables);
             samples = [sample] * c;
             output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: comparables[i], self.output_placeholder: desired_output});
+     
+
+    def classify_dichotomy_set(self, test_samples, test_diffs, d):
+        correct = 0;
+        total = len(test_samples);
+        for s in range(0, total):
+            v = self.classify_dichotomy(test_samples[s], d, 0.2, 0, 13, test_diffs[s]);
+            if(v == test_diffs[s]):
+                correct += 1;
+        return float(correct)/ float(total)
+        
         
 
 

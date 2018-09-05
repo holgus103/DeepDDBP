@@ -409,13 +409,15 @@ def labeled_dictionary(samples, labels):
     for v in range(0, len(samples)):
         if(not labels[v] in d):
             d[labels[v]] = [];
-        d[labels[v]].append([samples[v]]);
+        d[labels[v]].append(samples[v]);
+    for k in d:
+        print("key: {0} length: {1}".format(k, len(d[k]))); 
     return d;
 
 def get_output_for_pair(left, right):
     if(left == right):
         return [0.5, 0.5];
-    elif(left < right)
+    elif(left < right):
         return [0, 1];
     else:
         return [1, 0];
