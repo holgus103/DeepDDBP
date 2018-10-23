@@ -404,15 +404,18 @@ def suit_count_for_params(no_trump, trump):
         acc = acc + 4;
     return acc;
 
-def labeled_dictionary(samples, labels):
+def labeled_dictionary(samples, labels, counts):
     d = {}
     for v in range(0, len(samples)):
         if(not labels[v] in d):
             d[labels[v]] = [];
         d[labels[v]].append(samples[v]);
-    for k in d:
-        print("key: {0} length: {1}".format(k, len(d[k]))); 
-    return d;
+    out = {};
+       
+    for v in range(0,14):
+        out[v] = random.sample(d[v], counts);
+    return out;
+
 
 def get_output_for_pair(left, right):
     if(left == right):

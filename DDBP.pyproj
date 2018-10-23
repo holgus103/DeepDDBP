@@ -23,6 +23,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="data_parser.py" />
+    <Compile Include="generate_excel.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="parsing_tests.py" />
     <Compile Include="run\DDBP.py">
       <SubType>Code</SubType>
@@ -35,6 +38,9 @@
     </Compile>
     <Compile Include="models.py" />
     <Compile Include="run\Tests.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="test_script.py">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>

@@ -94,6 +94,8 @@ class Autoencoder(Model):
     Reference: https://github.com/aymericdamien/TensorFlow-Examples/blob/master/examples/3_NeuralNetworks/autoencoder.py
     """
 
+    DOWN = 0;
+    UP = 1;
 
     @property
     def session(self):
@@ -212,6 +214,8 @@ class Autoencoder(Model):
         init = tf.global_variables_initializer();
         a.session.run(init);
         return a;
+
+
 
     def __init__(self, input_count, layer_counts, loss):
         """
@@ -478,7 +482,7 @@ class Classifier(Model):
         self.output_placeholder = tf.placeholder("float", [None, outputs]);
         self.get_accuracy_tensors();
         
-    def create_train_summary(self, data_l, data_r, output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels, d):
+    def create_train_summary(self, data_l, data_r, output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels, res):
 
         def draw_whole_set(s, res, type):
             s.value.add(tag="{0} accuracy".format(type), simple_value=res[0])
@@ -490,20 +494,23 @@ class Classifier(Model):
                 s.value.add(tag="{0} - Recall - Wins for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 3])
                 s.value.add(tag="{0} - Recall - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 4])
                 s.value.add(tag="{0} - Recall - Loss for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 5])
-            s.value.add(tag="{0} - Dichotomy accuracy".format(type), simple_value=res[1+ 13*6+6])
             return s;
 
     
         s = tf.Summary();
-        r_tr = self.test(data_l, data_r, output, diffs, data, labels, d);
-        r_test = self.test(test_data_l, test_data_r, test_output, test_diffs, test_data, test_labels, d);
+        r_tr = self.test(data_l, data_r, output, diffs, data, labels);
+        r_test = self.test(test_data_l, test_data_r, test_output, test_diffs, test_data, test_labels);
         s = draw_whole_set(s, r_tr, "Train");
         s = draw_whole_set(s, r_test, "Test");
-
+        correct_correct, correct_wrong, wrong_correct, wrong_wrong = res;
+        s.value.add(tag="correct confirmed", simple_value=(float(correct_correct)/float(correct_correct + correct_wrong)))
+        s.value.add(tag="correct failed", simple_value=(float(correct_wrong)/float(correct_correct + correct_wrong)))
+        s.value.add(tag="wrong improved", simple_value=(float(wrong_correct)/float(wrong_correct + wrong_wrong)))
+        s.value.add(tag="still wrong", simple_value=(float(wrong_wrong)/float(wrong_wrong + wrong_correct)))
 
         return s;
 
-    def train(self, data_l, data_r, desired_output, learning_rate, it, delta, path, train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels, train_suits = 5, test_suits = 5, loss_f = Model.mse_loss, no_improvement = 5, experiment_name = ""):
+    def train(self, data_l, data_r, desired_output, learning_rate, it, delta, path, train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels, net_outputs, train_suits = 5, test_suits = 5, loss_f = Model.mse_loss, no_improvement = 5, experiment_name = ""):
         """
         Main train method
     
@@ -548,18 +555,19 @@ class Classifier(Model):
         summary_op = tf.summary.merge(summaries);
 
         writer = tf.summary.FileWriter(path, graph=self.autoencoder_l.session.graph)
-    
-        d = dp.labeled_dictionary(data, labels);
+        comparables = dp.labeled_dictionary(data, labels, 3);
+        #d = dp.labeled_dictionary(data, labels);
         if delta > 0:
             prev_val = 0;
             current_val = 0;
             no_improvement_counter = 0;
-            it_counter = 0;
+            it_counter = 0; 
             while True:
                 for k in range(0, len(data_r)):
                     lval, _, summary = self.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder_l: data_l[k], self.input_placeholder_r: data_r[k], self.output_placeholder: desired_output[k]});
-                if it_counter % 100 == 0:
-                    s = self.create_train_summary(train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels, d);
+                if it_counter % 1000 == 0:
+                    res = self.classify_sequential(test_data, comparables, test_labels, net_outputs, 0.2)
+                    s = self.create_train_summary(train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels, res);
                     #current_val = self.test(test_data_l, test_data_r, test_output)[0];
                     #print(current_val);
                     self.save_model(experiment_name + " at {0}".format(it_counter))
@@ -607,7 +615,7 @@ class Classifier(Model):
         self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
         return self.accuracy;
         
-    def test(self, data_l, data_r, desired_output, diffs, data, labels, d, margin = 0.2):
+    def test(self, data_l, data_r, desired_output, diffs, data, labels, margin = 0.2):
         """
         Test method
     
@@ -690,7 +698,6 @@ class Classifier(Model):
             res.append(float(tp_win[i]) / (float(tp_win[i] + fn_win[i]) or 1))
             res.append(float(tp_draw[i]) / (float(tp_draw[i] + fn_draw[i]) or 1))
             res.append(float(tp_loss[i]) / (float(tp_loss[i] + fn_loss[i]) or 1))
-        res.append(self.classify_dichotomy_set(data, labels, d));
         
 
         return res;          
@@ -782,24 +789,128 @@ class Classifier(Model):
             #print("left")
             return self.classify_dichotomy(sample, comparables, margin, middle + 1, end, output);
 
-    def classify_sequential(self, sample, compatables, output):
-        for i in range(0, 14):
-            val = dp.get_output_for_pair(output, i);
-            desired_outputs = [val] * c
-            c = len(comparables);
-            samples = [sample] * c;
-            output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: comparables[i], self.output_placeholder: desired_output});
-     
-
-    def classify_dichotomy_set(self, test_samples, test_diffs, d):
+    def classify_dichotomy_set(self, test_samples, test_diffs, d, margin):
         correct = 0;
         total = len(test_samples);
         for s in range(0, total):
-            v = self.classify_dichotomy(test_samples[s], d, 0.2, 0, 13, test_diffs[s]);
+            if(s % 1000 == 0):
+                print("Classified {0} samples".format(s));
+            v = self.classify_dichotomy(test_samples[s], d, margin, 0, 13, test_diffs[s]);
             if(v == test_diffs[s]):
                 correct += 1;
         return float(correct)/ float(total)
-        
+
+    def classify_sequential(self, samples, comparables, outputs, net_outputs, margin, direction = Autoencoder.UP, is_debug = False, dbg =  []):
+        correct_correct = 0;
+        correct_wrong = 0;
+        wrong_wrong = 0;
+        wrong_correct = 0;
+        for i in range(0, len(samples)):
+            if(i % 1000 == 0):
+                print("Classified {0} samples".format(i));
+            if(direction == Autoencoder.UP):
+                ans = self.compare_sequential(samples[i], comparables, outputs[i], margin, is_debug, dbg);
+            else:
+                ans = self.compare_sequential_down(samples[i], comparables, outputs[i], margin, is_debug, dbg);
+            # current value is right
+            #print(len(outputs));
+            #print(len(net_outputs));
+            if(outputs[i] == ans):
+                # network was also right
+                if(outputs[i] == net_outputs[i]):
+                    correct_correct += 1;
+                # network was wrong
+                else:
+                    wrong_correct += 1;
+            # current value is wrong
+            else:
+                # network was right before
+                if(outputs[i] == net_outputs[i]):
+                    correct_wrong += 1;
+                # both models were wrong
+                else:
+                    wrong_wrong += 1;
+
+        return (correct_correct, correct_wrong, wrong_correct, wrong_wrong);
+
+
+
+
+
+    def compare_sequential(self, sample, comparables, output, margin, is_debug, dbg):
+        tmp = []
+        for i in range(0, 14):
+            left = 0;
+            right = 0;
+            l = len(comparables[i])
+            samples = [sample] * l;
+            # construct answers
+            testing = comparables[i]; 
+            desired_outputs = [dp.get_output_for_pair(output, i)] * l;
+            o = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: testing, self.output_placeholder: desired_outputs});
+            if(is_debug):
+                tmp.append(o)
+            for val in o:
+                if abs(val[0] - val[1]) < margin:
+                    # this is a draw
+                    dbg.append(tmp)
+                    return i;
+                elif val[0] > val[1]:
+                    left += 1;
+                else:
+                    right += 1;
+            if(left < right):
+                dbg.append(tmp)
+                return i;
+        dbg.append(tmp)
+        return 0;
+
+        def compare_sequential_down(self, sample, comparables, output, margin, is_debug, dbg):
+            tmp = []
+            for x in range(0, 14):
+                i = 13 - x;
+                left = 0;
+                right = 0;
+                l = len(comparables[i])
+                samples = [sample] * l;
+                # construct answers
+                testing = comparables[i]; 
+                desired_outputs = [dp.get_output_for_pair(output, i)] * l;
+                o = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: testing, self.output_placeholder: desired_outputs});
+                if(is_debug):
+                    tmp.append(o)
+                for val in o:
+                    if abs(val[0] - val[1]) < margin:
+                        # this is a draw
+                        dbg.append(tmp)
+                        return i;
+                    elif val[0] > val[1]:
+                        left += 1;
+                    else:
+                        right += 1;
+                if(left > right):
+                    dbg.append(tmp)
+                    return i;
+            dbg.append(tmp)
+            return 0;
+
+    def verify_set(self, s, margin):
+        for i in range(0, 14):
+            for j in range(i+1, 14):
+                for k in range(0, len(s[j])):
+                    right = len(s[i]) * [s[j][k]]; 
+                    outputs = len(s[i]) * [np.array([0, 1])]
+                    o = self.session.run(self.layer, feed_dict={self.input_placeholder_l: s[i], self.input_placeholder_r: right, self.output_placeholder: outputs});
+                    for v in o:
+                        if(v[0] > v[1]):
+                            # print("Error for {0} and {1}".format(i, j));
+                            return False;
+        return True;
+                    
+                    
+                    
+            
+     
         
 
 
