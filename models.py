@@ -482,7 +482,7 @@ class Classifier(Model):
         self.output_placeholder = tf.placeholder("float", [None, outputs]);
         self.get_accuracy_tensors();
         
-    def create_train_summary(self, data_l, data_r, output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels, res):
+    def create_train_summary(self, data_l, data_r, output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels):
 
         def draw_whole_set(s, res, type):
             s.value.add(tag="{0} accuracy".format(type), simple_value=res[0])
@@ -502,11 +502,11 @@ class Classifier(Model):
         r_test = self.test(test_data_l, test_data_r, test_output, test_diffs, test_data, test_labels);
         s = draw_whole_set(s, r_tr, "Train");
         s = draw_whole_set(s, r_test, "Test");
-        correct_correct, correct_wrong, wrong_correct, wrong_wrong = res;
-        s.value.add(tag="correct confirmed", simple_value=(float(correct_correct)/float(correct_correct + correct_wrong)))
-        s.value.add(tag="correct failed", simple_value=(float(correct_wrong)/float(correct_correct + correct_wrong)))
-        s.value.add(tag="wrong improved", simple_value=(float(wrong_correct)/float(wrong_correct + wrong_wrong)))
-        s.value.add(tag="still wrong", simple_value=(float(wrong_wrong)/float(wrong_wrong + wrong_correct)))
+        #correct_correct, correct_wrong, wrong_correct, wrong_wrong = res;
+        #s.value.add(tag="correct confirmed", simple_value=(float(correct_correct)/float(correct_correct + correct_wrong)))
+        #s.value.add(tag="correct failed", simple_value=(float(correct_wrong)/float(correct_correct + correct_wrong)))
+        #s.value.add(tag="wrong improved", simple_value=(float(wrong_correct)/float(wrong_correct + wrong_wrong)))
+        #s.value.add(tag="still wrong", simple_value=(float(wrong_wrong)/float(wrong_wrong + wrong_correct)))
 
         return s;
 
@@ -566,8 +566,8 @@ class Classifier(Model):
                 for k in range(0, len(data_r)):
                     lval, _, summary = self.session.run([loss, optimizer, summary_op], feed_dict={self.input_placeholder_l: data_l[k], self.input_placeholder_r: data_r[k], self.output_placeholder: desired_output[k]});
                 if it_counter % 1000 == 0:
-                    res = self.classify_sequential(test_data, comparables, test_labels, net_outputs, 0.2)
-                    s = self.create_train_summary(train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels, res);
+                    #res = self.classify_sequential(test_data, comparables, test_labels, net_outputs, 0.2)
+                    s = self.create_train_summary(train_data_l, train_data_r, train_output, diffs, test_data_l, test_data_r, test_output, test_diffs, data, labels, test_data, test_labels);
                     #current_val = self.test(test_data_l, test_data_r, test_output)[0];
                     #print(current_val);
                     self.save_model(experiment_name + " at {0}".format(it_counter))
@@ -850,6 +850,35 @@ class Classifier(Model):
             o = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: testing, self.output_placeholder: desired_outputs});
             if(is_debug):
                 tmp.append(o)
+            #for val in o:
+            #    if abs(val[0] - val[1]) < margin:
+            #        # this is a draw
+            #        dbg.append(tmp)
+            #        return i;
+            #    elif val[0] > val[1]:
+            #        left += 1;
+            #    else:
+            #        right += 1;
+            #if(left < right):
+            #    dbg.append(tmp)
+            #    return i;
+        dbg.append(tmp)
+        return 0;
+
+    def compare_sequential_down(self, sample, comparables, output, margin, is_debug, dbg):
+        tmp = []
+        for x in range(0, 14):
+            i = 13 - x;
+            left = 0;
+            right = 0;
+            l = len(comparables[i])
+            samples = [sample] * l;
+            # construct answers
+            testing = comparables[i]; 
+            desired_outputs = [dp.get_output_for_pair(output, i)] * l;
+            o = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: testing, self.output_placeholder: desired_outputs});
+            if(is_debug):
+                tmp.append(o)
             for val in o:
                 if abs(val[0] - val[1]) < margin:
                     # this is a draw
@@ -859,42 +888,15 @@ class Classifier(Model):
                     left += 1;
                 else:
                     right += 1;
-            if(left < right):
+            if(left > right):
                 dbg.append(tmp)
                 return i;
         dbg.append(tmp)
         return 0;
 
-        def compare_sequential_down(self, sample, comparables, output, margin, is_debug, dbg):
-            tmp = []
-            for x in range(0, 14):
-                i = 13 - x;
-                left = 0;
-                right = 0;
-                l = len(comparables[i])
-                samples = [sample] * l;
-                # construct answers
-                testing = comparables[i]; 
-                desired_outputs = [dp.get_output_for_pair(output, i)] * l;
-                o = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: testing, self.output_placeholder: desired_outputs});
-                if(is_debug):
-                    tmp.append(o)
-                for val in o:
-                    if abs(val[0] - val[1]) < margin:
-                        # this is a draw
-                        dbg.append(tmp)
-                        return i;
-                    elif val[0] > val[1]:
-                        left += 1;
-                    else:
-                        right += 1;
-                if(left > right):
-                    dbg.append(tmp)
-                    return i;
-            dbg.append(tmp)
-            return 0;
-
     def verify_set(self, s, margin):
+        counter = 0;
+        correct = 0;
         for i in range(0, 14):
             for j in range(i+1, 14):
                 for k in range(0, len(s[j])):
@@ -902,10 +904,13 @@ class Classifier(Model):
                     outputs = len(s[i]) * [np.array([0, 1])]
                     o = self.session.run(self.layer, feed_dict={self.input_placeholder_l: s[i], self.input_placeholder_r: right, self.output_placeholder: outputs});
                     for v in o:
-                        if(v[0] > v[1]):
+                        counter += 1;
+                        if(v[0] < v[1]):
+                            correct += 1;
                             # print("Error for {0} and {1}".format(i, j));
-                            return False;
-        return True;
+                            #return False;
+        #return True;
+        return (counter, correct)
                     
                     
                     

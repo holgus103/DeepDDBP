@@ -4,14 +4,14 @@ import sys;
 import tensorflow as tf
 import numpy;
 # configure here
-TEST_TRUMP = False
-TRAIN_TRUMP = False
-TEST_NO_TRUMP = True
-TRAIN_NO_TRUMP = True
+TEST_TRUMP = True
+TRAIN_TRUMP = True
+TEST_NO_TRUMP = False
+TRAIN_NO_TRUMP = False
 BATCHES = 4
-PARTITION = 0.66
-SET_SIZE = 600000
-EXPERIMENT = "no_trump_l_104_52_13_p104_c_2_comparison"
+PARTITION = 0.50
+SET_SIZE = 200000
+EXPERIMENT = "trump_l_104_52_13_p104_c_2_no_draws"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
@@ -63,19 +63,18 @@ a = models.Autoencoder.build(208, [104, 52, 13], models.Model.cross_entropy_loss
 c = models.Classifier(a, 2);
 
 
-c.restore_model("no_trump_l_104_52_13_p104_c_2_comparison at 27000");
+c.restore_model("no_trump_l_104_52_13_p104_c_2_no_draws at 21100");
 #success = False;
 #cnt = 0;
 #while(not success):
-comparables = dp.labeled_dictionary(data, labels, 5);
+comparables = dp.labeled_dictionary(data, labels, 7);
 samples = dp.labeled_dictionary(test_data, test_labels, 10);
 l = []
 c.classify_sequential([samples[i][j] for i in range(0,14) for j in range(0, 10)], comparables, [ i for i in range(0, 14) for x in range(0, 10)], [ i for i in range(0, 14) for x in range(0, 10)], 0.05, models.Autoencoder.UP, True, l)
-margin = 0.2
 # generate actual data
-res = [[[0 if abs(test[0] - test[1]) < 0.05 else -1 if test[1] > test[0] else 1 for test in value] for value in sample ] for sample in l ]
+res = [[[0 if abs(test[0] - test[1]) < 0 else -1 if test[1] > test[0] else 1 for test in value] for value in sample ] for sample in l ]
 
-file = open('res.csv','w') 
+file = open('res_no_draws.csv','w') 
 for sample in range(0,140):
     file.write("sample, {0} \n".format(int(sample/10)))
     for value in range(0, len(res[sample])):
