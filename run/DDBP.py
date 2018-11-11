@@ -10,9 +10,9 @@ TRAIN_TRUMP = True
 TEST_NO_TRUMP = False
 TRAIN_NO_TRUMP = False
 BATCHES = 4
-PARTITION = 0.5
+PARTITION = 0.50
 SET_SIZE = 200000
-EXPERIMENT = "trump_rotations_156enc_eta=0.004_deep_comparison"
+EXPERIMENT = "trump_rotations_156enc_eta=0.004_no_draws"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
@@ -43,8 +43,8 @@ test_labels = list(map(lambda x: x.argmax(), test_labels));
 net_outputs = list(map(lambda x: x.argmax(), net_outputs[0]));
 
 #(data, labels, test_data, test_labels) = dp.read_file("./../data/library", SET_SIZE, True, TRAIN_NO_TRUMP, TRAIN_TRUMP, TEST_NO_TRUMP, TEST_TRUMP, PARTITION);
-(samples_l, samples_r, outputs, diffs) = dp.generate_random_pair_for_samples(data, labels)
-(test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_random_pair_for_samples(test_data, test_labels);
+(samples_l, samples_r, outputs, diffs) = dp.generate_balanced_classes(data, labels, 400000, 0, 400000)
+(test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_balanced_classes(test_data, test_labels, 400000, 0, 400000);
 
 
 #limit claffication test samples
