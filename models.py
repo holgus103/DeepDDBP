@@ -480,14 +480,16 @@ class Classifier(Model):
 
         def draw_whole_set(s, res, type):
             s.value.add(tag="{0} accuracy".format(type), simple_value=res[0])
+            s.value.add(tag="{0} - Precision - Draws for diff".format(type), simple_value=res[1])
+            s.value.add(tag="{0} - Recall - Draws for diff".format(type), simple_value=res[2])
             # draw corrects
             for i in range(0, 14):
-                s.value.add(tag="{0} - Precision - Wins for diff {1}".format(type, i), simple_value=res[1 + 6 * i])
-                s.value.add(tag="{0} - Precision - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 1])
-                s.value.add(tag="{0} - Precision - Loss for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 2])
-                s.value.add(tag="{0} - Recall - Wins for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 3])
-                s.value.add(tag="{0} - Recall - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 4])
-                s.value.add(tag="{0} - Recall - Loss for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 5])
+                s.value.add(tag="{0} - Precision - Wins for diff {1}".format(type, i), simple_value=res[3 + 4 * i])
+                #s.value.add(tag="{0} - Precision - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 1])
+                s.value.add(tag="{0} - Precision - Loss for diff {1}".format(type, i), simple_value=res[3 + 4 * i + 1])
+                s.value.add(tag="{0} - Recall - Wins for diff {1}".format(type, i), simple_value=res[3 + 4 * i + 2])
+                #s.value.add(tag="{0} - Recall - Draws for diff {1}".format(type, i), simple_value=res[1 + 6 * i + 4])
+                s.value.add(tag="{0} - Recall - Loss for diff {1}".format(type, i), simple_value=res[3 + 4 * i + 3])
 
             return s;
 
@@ -630,13 +632,13 @@ class Classifier(Model):
         output = self.session.run(self.layer, feed_dict={self.input_placeholder_l: data_l, self.input_placeholder_r: data_r, self.output_placeholder: desired_output});
         l = len(diffs)
         tp_win = np.repeat(0, 14);
-        tp_draw = np.repeat(0, 14);
+        tp_draw = 0
         tp_loss = np.repeat(0, 14);
         fn_win = np.repeat(0, 14);
-        fn_draw = np.repeat(0, 14);
+        fn_draw = 0
         fn_loss = np.repeat(0, 14);
         fp_win = np.repeat(0, 14);
-        fp_draw = np.repeat(0, 14);
+        fp_draw = 0
         fp_loss = np.repeat(0, 14);
         global_correct = 0;
         for i in range(0,l):
@@ -645,10 +647,10 @@ class Classifier(Model):
             if(abs(output[i][0] - output[i][1]) < margin):
                 # marked correctly
                 if(r == 0):
-                    tp_draw[r] += 1;
+                    tp_draw += 1;
                     global_correct += 1;
                 else:
-                    fp_draw[r] += 1;
+                    fp_draw += 1;
                     if(desired_output[i][0] > desired_output[i][1]):
                         fn_win[r] += 1;
                     else:
@@ -659,7 +661,7 @@ class Classifier(Model):
                 if(output[i][0] > output[i][1]):
                     if(r == 0):
                         fp_win[r] += 1;
-                        fn_draw[r] += 1;
+                        fn_draw += 1;
                     elif(desired_output[i][0] > desired_output[i][1]):
                         tp_win[r] += 1;
                         global_correct += 1;
@@ -669,7 +671,7 @@ class Classifier(Model):
                 else:
                     if(r == 0):
                         fp_loss[r] += 1;
-                        fn_draw[r] += 1;
+                        fn_draw += 1;
                     elif(desired_output[i][0] < desired_output[i][1]):
                         tp_loss[r] += 1;
                         global_correct += 1;
@@ -681,12 +683,12 @@ class Classifier(Model):
         
         # write accuracy
         res.append(float(global_correct)/float(len(diffs)))
+        res.append(float(tp_draw) / (float(tp_draw + fp_draw) or 1))
+        res.append(float(tp_draw) / (float(tp_draw + fn_draw) or 1))
         for i in range(0,14):
             res.append(float(tp_win[i]) / (float(tp_win[i] + fp_win[i]) or 1))
-            res.append(float(tp_draw[i]) / (float(tp_draw[i] + fp_draw[i]) or 1))
             res.append(float(tp_loss[i]) / (float(tp_loss[i] + fp_loss[i]) or 1))
             res.append(float(tp_win[i]) / (float(tp_win[i] + fn_win[i]) or 1))
-            res.append(float(tp_draw[i]) / (float(tp_draw[i] + fn_draw[i]) or 1))
             res.append(float(tp_loss[i]) / (float(tp_loss[i] + fn_loss[i]) or 1))
 
         return res;          
