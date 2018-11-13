@@ -11,7 +11,7 @@ TEST_NO_TRUMP = False
 TRAIN_NO_TRUMP = False
 BATCHES = 4
 PARTITION = 0.50
-SET_SIZE = 200000
+SET_SIZE = 2000
 EXPERIMENT = "trump_rotations_156enc_eta=0.004_no_draws"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
@@ -27,7 +27,7 @@ import models;
 import data_parser as dp;
 
 experiment_name = EXPERIMENT;
-path = "./summaries/{0}/".format(experiment_name);
+path = "./run/summaries/{0}/".format(experiment_name);
 
 dp.initialize_random(experiment_name);
 
@@ -43,8 +43,8 @@ test_labels = list(map(lambda x: x.argmax(), test_labels));
 net_outputs = list(map(lambda x: x.argmax(), net_outputs[0]));
 
 #(data, labels, test_data, test_labels) = dp.read_file("./../data/library", SET_SIZE, True, TRAIN_NO_TRUMP, TRAIN_TRUMP, TEST_NO_TRUMP, TEST_TRUMP, PARTITION);
-(samples_l, samples_r, outputs, diffs) = dp.generate_balanced_classes(data, labels, 400000, 0, 400000)
-(test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_balanced_classes(test_data, test_labels, 400000, 0, 400000);
+(samples_l, samples_r, outputs, diffs) = dp.generate_balanced_classes(data, labels, 4000, 0, 4000)
+(test_samples_l, test_samples_r, test_outsputs, test_diffs) = dp.generate_balanced_classes(test_data, test_labels, 4000, 0, 4000);
 
 
 #limit claffication test samples
@@ -78,11 +78,11 @@ print(len(data));
 print(len(test_data))
 
 # create autoencoder
-a = models.Autoencoder.build(208, [104, 52, 13], models.Model.cross_entropy_loss);
+a = models.Autoencoder.build(208, [[26, 26, 26, 26], [52], [13]], models.Model.cross_entropy_loss);
 
 
 # pretrain each layer
-a.pretrain(0.001, 0, 1000, data_batches, 0, 0.1, path + "{0}" , optimizer, 0.2, 15);
+a.pretrain(0.001, 0, 1000, data_batches, 0, 10, path + "{0}" , optimizer, 0.2, 15);
 
 # create classifier
 c = models.Classifier(a, 2);

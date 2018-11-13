@@ -113,7 +113,7 @@ class Autoencoder(Model):
         """
         return self.__session;
 
-    def create_layer(self, index, input, is_fixed = False, is_decoder = False):
+    def create_layer(self, prev, current, input, is_fixed = False, is_decoder = False):
         """
         Creates an autoencoder layer
 
@@ -133,15 +133,30 @@ class Autoencoder(Model):
         Tensor 
             Created layer
         """
-        if is_fixed:
-            if is_decoder:
-                return tf.nn.sigmoid(tf.add(tf.matmul(input, self.fixed_weights[index], transpose_b = is_decoder), self.out_biases_fixed[index]));
-            return tf.nn.sigmoid(tf.add(tf.matmul(input, self.fixed_weights[index], transpose_b = is_decoder), self.fixed_biases[index]));
-        if is_decoder:
-            return tf.nn.sigmoid(tf.add(tf.matmul(input, self.weights[index], transpose_b = is_decoder), self.out_biases[index]));
-        return tf.nn.sigmoid(tf.add(tf.matmul(input, self.weights[index], transpose_b = is_decoder), self.biases[index]));
+        prev_len = len(self.weights[prev])
+        curr_len = len(self.weights[current])
+        out = [];
+        if(prev_len > curr_len):
+        # previous layer has several sublayers, concat the output and pass 
+            inp = [tf.concat(input, 1)];
+        elif(curr_len > prev_len):
+            inp = [tf.slice(input[0], [0, i * (self.layer_counts[prev]/curr_len)],[-1, (self.layer_counts[prev]/curr_len)]) for i in range(0, curr_len)]
+        else:
+            inp = input;   
+        for index in range(0, curr_len):
+            if is_fixed:
+                if is_decoder:
+                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(inp, self.fixed_weights[current][index], transpose_b = is_decoder), self.out_biases_fixed[current][index])))   
+                else:    
+                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(input, self.fixed_weights[current][index], transpose_b = is_decoder), self.fixed_biases[current][index])));
+            else:
+                if is_decoder:
+                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(input, self.weights[current][index], transpose_b = is_decoder), self.out_biases[current][index])));
+                else:
+                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(input, self.weights[current][index], transpose_b = is_decoder), self.biases[current][index])));
+        return out;
 
-    def create_weights(self, prev_count, curr_count):
+    def create_weights(self, prev_count, curr_count, position):
         """
         Creates weights for a layer
 
@@ -154,19 +169,30 @@ class Autoencoder(Model):
             Neuron count of the current layer
 
         """
+        def create_list_items(list, position):
+            while(len(list) <= position):
+                list.append([])
+
         w = tf.Variable(tf.random_normal([prev_count, curr_count]), trainable = True, name='v_W{0}'.format(curr_count));
         b = tf.Variable(tf.random_normal([curr_count]), trainable = True, name='v_B{0}'.format(curr_count));
-        self.weights.append(w);
-        self.biases.append(b);
+        create_list_items(self.weights, position)
+        create_list_items(self.biases, position)
+        self.weights[position].append(w);
+        self.biases[position].append(b);
         w_f = tf.Variable(tf.identity(w), trainable = False, name='f_W{0}'.format(curr_count));
         b_f = tf.Variable(tf.identity(b), trainable = False, name='f_B{0}'.format(curr_count));
-        self.fixed_weights.append(w_f);
-        self.fixed_biases.append(b_f);
+        create_list_items(self.fixed_weights, position)
+        create_list_items(self.fixed_biases, position)
+        self.fixed_weights[position].append(w_f);
+        self.fixed_biases[position].append(b_f);
         
         b_out = tf.Variable(tf.random_normal([prev_count]), trainable = True, name='v_B_out{0}'.format(curr_count));
         b_out_fixed = tf.Variable(tf.identity(b_out), trainable = False, name='f_B_out{0}'.format(curr_count));
-        self.out_biases.append(b_out);
-        self.out_biases_fixed.append(b_out_fixed);
+        create_list_items(self.out_biases, position)
+        create_list_items(self.out_biases_fixed, position)
+        self.out_biases[position].append(b_out);
+        self.out_biases_fixed[position].append(b_out_fixed);
+
 
     def clone_weights(self, a):
 
@@ -201,7 +227,7 @@ class Autoencoder(Model):
         a = cls(src.input_count, src.layer_counts, src.loss)
         a.clone_weights(src)
         a.__session = src.session;
-        a.session.run(tf.variables_initializer(a.weights + a.biases + a.fixed_biases + a.fixed_weights + a.out_biases + a.out_biases_fixed))
+        #a.session.run(tf.variables_initializer(a.weights + a.biases + a.fixed_biases + a.fixed_weights + a.out_biases + a.out_biases_fixed))
         return a;
 
     @classmethod
@@ -209,7 +235,15 @@ class Autoencoder(Model):
         a = cls(input_count, layer_counts, loss);
         a.prepare_session();
         for i in range(0, len(a.layer_counts)-1):
-            a.create_weights(a.layer_counts[i], a.layer_counts[i + 1]);
+            current_count = a.layer_counts[i];
+            next_count = a.layer_counts[i + 1];
+            if(len(next_count)>1):
+            # connect next layer one by one
+                for j in range(0, len(next_count)):
+                    a.create_weights(current_count[0], next_count[j], i);
+            else:
+            # next layer is a simple layer, thus concatenation will be performed
+                a.create_weights(sum(current_count), next_count[0], i);
 
         init = tf.global_variables_initializer();
         a.session.run(init);
@@ -234,7 +268,7 @@ class Autoencoder(Model):
         """
         self.loss = loss;
         self.input_count = input_count;
-        self.layer_counts = [input_count] +layer_counts;
+        self.layer_counts = [[input_count]] + layer_counts;
         self.weights = [];
         self.biases = [];
         self.out_biases = [];
@@ -426,18 +460,18 @@ class Autoencoder(Model):
         """
         layers = [];
         inp = input;
-        for i in range(0, n):
-            inp = self.create_layer(i, inp, is_fixed = True);
+        for i in range(1, n+1):
+            inp = self.create_layer(i-1, i, inp, is_fixed = True);
             layers.append(inp);
         
-        inp = self.create_layer(n, inp);
+        inp = self.create_layer(n, n + 1, inp);
         layers.append(inp);
 
-        inp = self.create_layer(n, inp, is_decoder = True);
+        inp = self.create_layer(n, n + 1, inp, is_decoder = True);
         layers.append(inp);
         
         for i in range(0, n):
-            inp = self.create_layer(n - 1 - i, inp, is_fixed = True, is_decoder = True);
+            inp = self.create_layer(n - i + 1, n - i, inp, is_fixed = True, is_decoder = True);
             layers.append(inp);
         return layers;
 
