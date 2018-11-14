@@ -133,27 +133,33 @@ class Autoencoder(Model):
         Tensor 
             Created layer
         """
-        prev_len = len(self.weights[prev])
-        curr_len = len(self.weights[current])
+        prev_len = len(self.layer_counts[prev])
+        curr_len = len(self.layer_counts[current])
         out = [];
-        if(prev_len > curr_len):
-        # previous layer has several sublayers, concat the output and pass 
-            inp = [tf.concat(input, 1)];
+
+        rounds = curr_len > prev_len and curr_len or prev_len;
+        if(prev_len > curr_len and (not is_decoder)):
+            v = tf.concat(input, 1);
+            inp = [v,v,v,v]
+            rounds = 1;
         elif(curr_len > prev_len):
-            inp = [tf.slice(input[0], [0, i * (self.layer_counts[prev]/curr_len)],[-1, (self.layer_counts[prev]/curr_len)]) for i in range(0, curr_len)]
+            inp = [tf.slice(input[0], [0, i * (int(self.layer_counts[prev][0]/curr_len))],[-1, (int(self.layer_counts[prev][0]/curr_len))]) for i in range(0, curr_len)]
         else:
             inp = input;   
-        for index in range(0, curr_len):
+        for index in range(0, rounds):
             if is_fixed:
                 if is_decoder:
-                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(inp, self.fixed_weights[current][index], transpose_b = is_decoder), self.out_biases_fixed[current][index])))   
+                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(inp[index], self.fixed_weights[current][index], transpose_b = is_decoder), self.out_biases_fixed[current-1][index])))   
                 else:    
-                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(input, self.fixed_weights[current][index], transpose_b = is_decoder), self.fixed_biases[current][index])));
+                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(inp[index], self.fixed_weights[current-1][index], transpose_b = is_decoder), self.fixed_biases[current][index])));
             else:
                 if is_decoder:
-                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(input, self.weights[current][index], transpose_b = is_decoder), self.out_biases[current][index])));
+                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(inp[index], self.weights[current][index], transpose_b = is_decoder), self.out_biases[current][index])));
                 else:
-                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(input, self.weights[current][index], transpose_b = is_decoder), self.biases[current][index])));
+                    out.append(tf.nn.sigmoid(tf.add(tf.matmul(inp[index], self.weights[current-1][index], transpose_b = is_decoder), self.biases[current-1][index])));
+        if(prev_len > curr_len and is_decoder):
+        # previous layer has several sublayers, concat the output and pass 
+            return tf.concat(out, 1);
         return out;
 
     def create_weights(self, prev_count, curr_count, position):
@@ -198,21 +204,37 @@ class Autoencoder(Model):
 
         # copy weights
         for w in a.weights:
-            _w = tf.Variable(w);
-            self.weights.append(_w);
-            self.fixed_weights.append(tf.Variable(tf.identity(_w)))
+            t = [];
+            t_fixed = [];
+            for weight in w:        
+                _w = tf.Variable(weight);
+                t.append(_w)
+                t_fixed.append(tf.Variable(tf.identity(_w), trainable = False))
+            self.weights.append(t);
+            self.fixed_weights.append(t_fixed);
 
         # copy biases
         for b in a.biases:
-            _b = tf.Variable(b);
-            self.biases.append(_b);
-            self.fixed_biases.append(tf.Variable(tf.identity(_b)));
+            t = []
+            t_fixed = []
+            for bias in b:            
+                _b = tf.Variable(bias);
+                t.append(_b);
+                t_fixed.append(tf.Variable(tf.identity(_b), trainable = False));
+            self.biases.append(t);
+            self.fixed_biases.append(t_fixed);
+
 
         # copy output biases
         for b_out in a.out_biases:
-            _b_out = tf.Variable(b_out);
-            self.out_biases.append(_b_out);
-            self.out_biases_fixed.append(tf.Variable(tf.identity(_b_out)))
+            t = []
+            t_fixed = []
+            for bias in b_out:
+                _b_out = tf.Variable(bias);
+                t.append(_b_out);
+                t_fixed.append(tf.Variable(tf.identity(_b_out), trainable = False))
+            self.out_biases.append(t)
+            self.out_biases_fixed.append(t_fixed)
 
 
 
@@ -224,15 +246,16 @@ class Autoencoder(Model):
         :param a:
         :param autoencoder:
         """
-        a = cls(src.input_count, src.layer_counts, src.loss)
+        a = cls(src.layer_counts, src.loss)
         a.clone_weights(src)
         a.__session = src.session;
-        #a.session.run(tf.variables_initializer(a.weights + a.biases + a.fixed_biases + a.fixed_weights + a.out_biases + a.out_biases_fixed))
+        vars = [x for v in [a.weights + a.biases + a.fixed_biases + a.fixed_weights + a.out_biases + a.out_biases_fixed] for y in v for x in y]
+        a.session.run(tf.variables_initializer(vars))
         return a;
 
     @classmethod
     def build(cls, input_count, layer_counts, loss):
-        a = cls(input_count, layer_counts, loss);
+        a = cls([[input_count]] + layer_counts, loss);
         a.prepare_session();
         for i in range(0, len(a.layer_counts)-1):
             current_count = a.layer_counts[i];
@@ -240,7 +263,11 @@ class Autoencoder(Model):
             if(len(next_count)>1):
             # connect next layer one by one
                 for j in range(0, len(next_count)):
-                    a.create_weights(current_count[0], next_count[j], i);
+                    if(len(current_count) == 1):
+                        current = int(current_count[0] / len(next_count));
+                    else:
+                        current = current_count[j]
+                    a.create_weights(current, next_count[j], i);
             else:
             # next layer is a simple layer, thus concatenation will be performed
                 a.create_weights(sum(current_count), next_count[0], i);
@@ -251,7 +278,7 @@ class Autoencoder(Model):
 
 
 
-    def __init__(self, input_count, layer_counts, loss):
+    def __init__(self, layer_counts, loss):
         """
         Main class constructor
 
@@ -267,8 +294,8 @@ class Autoencoder(Model):
 
         """
         self.loss = loss;
-        self.input_count = input_count;
-        self.layer_counts = [[input_count]] + layer_counts;
+        self.input_count = layer_counts[0][0];
+        self.layer_counts = layer_counts;
         self.weights = [];
         self.biases = [];
         self.out_biases = [];
@@ -351,7 +378,7 @@ class Autoencoder(Model):
 
         input = self.input;
         step = tf.Variable(0, name='global_step', trainable=False);
-        net = self.build_pretrain_net(i, input);
+        net = self.build_pretrain_net(i, [input]);
         loss_function = self.loss(net[len(net) - 1], input);
         if(optimizer_class is tf.train.GradientDescentOptimizer):
             opt = optimizer_class(learning_rate);
@@ -361,7 +388,9 @@ class Autoencoder(Model):
         vars = self.get_variables_to_init(i);
         vars.append(step);
         self.session.run(tf.variables_initializer(vars));  
-        vars.extend([self.weights[i], self.biases[i], self.out_biases[i]])
+        vars.extend(self.weights[i])
+        vars.extend(self.biases[i])
+        vars.extend(self.out_biases[i])
         self.session.run(Model.initialize_optimizer(opt, vars));
         loss_summary = tf.summary.scalar("loss", loss_function);
         weights_summary = tf.summary.histogram("weights", self.weights[i]);
@@ -434,7 +463,7 @@ class Autoencoder(Model):
         net = [];
         inp = input;
         for i in range(0, len(self.weights)):
-            inp = self.create_layer(i, inp);
+            inp = self.create_layer(i, i+1, inp);
             net.append(inp);
             
         return net;
@@ -467,7 +496,7 @@ class Autoencoder(Model):
         inp = self.create_layer(n, n + 1, inp);
         layers.append(inp);
 
-        inp = self.create_layer(n, n + 1, inp, is_decoder = True);
+        inp = self.create_layer(n + 1, n, inp, is_decoder = True);
         layers.append(inp);
         
         for i in range(0, n):
@@ -501,11 +530,11 @@ class Classifier(Model):
         self.input_placeholder_l = tf.placeholder("float", [None, self.autoencoder_l.input_count]);
         self.input_placeholder_r = tf.placeholder("float", [None, self.autoencoder_r.input_count]);
         # build final encoding layers
-        self.encoder_l = self.autoencoder_l.build_complete_net(self.input_placeholder_l);
-        self.encoder_r = self.autoencoder_r.build_complete_net(self.input_placeholder_r);
+        self.encoder_l = self.autoencoder_l.build_complete_net([self.input_placeholder_l]);
+        self.encoder_r = self.autoencoder_r.build_complete_net([self.input_placeholder_r]);
 
-        input_l = self.encoder_l[len(self.encoder_l) - 1];
-        input_r = self.encoder_r[len(self.encoder_r) - 1];
+        input_l = self.encoder_l[len(self.encoder_l) - 1][0];
+        input_r = self.encoder_r[len(self.encoder_r) - 1][0];
 
         input = tf.concat([input_l, input_r], 1)
         self.session = autoencoder.session;
@@ -575,11 +604,18 @@ class Classifier(Model):
             If the error function value worsens the amount of times specified by this parameter the calculation will be aborted
             
         """
+
+        def flatmap(list):
+            return [x for v in list for x in v]
         loss = loss_f(self.output_placeholder, self.layer);
         opt = tf.train.RMSPropOptimizer(learning_rate);
         optimizer = opt.minimize(loss);
         self.session.run(tf.variables_initializer([self.weights, self.biases]));
-        slot_vars = [self.weights, self.biases] + self.autoencoder_r.weights+ self.autoencoder_l.weights + self.autoencoder_l.biases + self.autoencoder_r.biases;
+        slot_vars = [self.weights, self.biases];
+        slot_vars.extend(flatmap(self.autoencoder_r.weights))
+        slot_vars.extend(flatmap(self.autoencoder_l.weights))
+        slot_vars.extend(flatmap(self.autoencoder_l.biases))
+        slot_vars.extend(flatmap(self.autoencoder_r.biases));
         self.session.run(Model.initialize_optimizer(opt, slot_vars));
         #self.session.run(tf.initialize_all_variables());
         hist_summaries = [(self.autoencoder_l.weights[i], 'weights{0}'.format(i)) for i in range(0, len(self.autoencoder_l.weights))];
