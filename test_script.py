@@ -12,7 +12,7 @@ TRAIN_NO_TRUMP = True
 BATCHES = 4
 PARTITION = 0.66
 SET_SIZE = 600000
-EXPERIMENT = "no_trump_l_104_52_13_p104_c_2_no_draws"
+EXPERIMENT = "no_trump_rotations_156enc_eta=0.002_no_draws"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
@@ -57,14 +57,15 @@ net_outputs = list(map(lambda x: x.argmax(), net_outputs[0]));
 #l = len(data);
 
 # create autoencoder
-a = models.Autoencoder.build(208, [104, 52, 13], models.Model.cross_entropy_loss);
+#a = models.Autoencoder.build(208, [[26, 26, 26, 26], [52], [13]], models.Model.cross_entropy_loss);
+#a = models.Autoencoder.build(208, [104, 52, 13], models.Model.cross_entropy_loss);
 
 
 # create classifier
 c = models.Classifier(a, 2);
 
 
-c.restore_model("no_trump_l_104_52_13_p104_c_2_no_draws at 21100");
+c.restore_model("no_trump_rotations_156enc_eta=0.002_no_draws at 40000");
 #success = False;
 #cnt = 0;
 #while(not success):
@@ -72,7 +73,7 @@ comparables = dp.labeled_dictionary(data, labels, 7);
     #success = c.verify_set(comparables, 0.2);
     #cnt += 1;
     #print(cnt);
-res = c.classify_sequential(test_data, comparables, test_labels, net_outputs, 0.05)
+res = c.classify_sequential(test_data, comparables, test_labels, net_outputs, 0.00)
 correct_correct, correct_wrong, wrong_correct, wrong_wrong = res;
 
 float(correct_correct + wrong_correct) / sum(res)
