@@ -11,7 +11,7 @@ TRAIN_NO_TRUMP = False
 BATCHES = 4
 PARTITION = 0.50
 SET_SIZE = 200000
-EXPERIMENT = "trump_l_104_52_13_p104_c_2_no_draws"
+EXPERIMENT = "trump_rotations_156enc_eta=0.004_no_draws"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
@@ -63,7 +63,7 @@ a = models.Autoencoder.build(208, [104, 52, 13], models.Model.cross_entropy_loss
 c = models.Classifier(a, 2);
 
 
-c.restore_model("no_trump_l_104_52_13_p104_c_2_no_draws at 21100");
+c.restore_model("trump_rotations_156enc_eta=0.004_no_draws at 27000");
 #success = False;
 #cnt = 0;
 #while(not success):

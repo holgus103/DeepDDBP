@@ -12,7 +12,7 @@ TRAIN_NO_TRUMP = True
 BATCHES = 4
 PARTITION = 0.66
 SET_SIZE = 600000
-EXPERIMENT = "no_trump_l_104_52_13_p104_c_2_no_draws"
+EXPERIMENT = "no_trump_rotations_156enc_eta=0.002_no_draws"
 # l - layers 208 - 104 - 52 - 13 x2
 # p - pretrain 104
 # c - classified 2x13 -> 2
@@ -64,20 +64,17 @@ a = models.Autoencoder.build(208, [104, 52, 13], models.Model.cross_entropy_loss
 c = models.Classifier(a, 2);
 
 
-c.restore_model("no_trump_l_104_52_13_p104_c_2_no_draws at 21100");
+c.restore_model("no_trump_rotations_156enc_eta=0.002_no_draws at 40000");
 #success = False;
 #cnt = 0;
 #while(not success):
-comparables = dp.labeled_dictionary(data, labels, 7);
+#comparables = dp.labeled_dictionary(data, labels, 7);
     #success = c.verify_set(comparables, 0.2);
     #cnt += 1;
     #print(cnt);
-res = c.classify_sequential(test_data, comparables, test_labels, net_outputs, 0.05)
-correct_correct, correct_wrong, wrong_correct, wrong_wrong = res;
+#res = c.classify_sequential(test_data, comparables, test_labels, net_outputs, 0.0)
 
-float(correct_correct + wrong_correct) / sum(res)
-float(correct_correct) / (correct_correct + correct_wrong)
-float(wrong_correct) / (wrong_correct + wrong_wrong)
+
 # evaluate results
 # print(c.test(data, outputs));
 # print(c.test(test_data, test_outputs));
@@ -85,5 +82,22 @@ float(wrong_correct) / (wrong_correct + wrong_wrong)
 # print(c.suit_based_accurancy(test_data, test_outputs, dp.suit_count_for_params(TEST_NO_TRUMP, TEST_TRUMP)));
 #c.save_model(experiment_name);
 
+def get_stats(res):
+    correct_correct, correct_wrong, wrong_correct, wrong_wrong = res;
+    print("accuracy: {0}".format(float(correct_correct + wrong_correct) / sum(res)))
+    print("confirmed correct: {0}".format(float(correct_correct) / (correct_correct + correct_wrong)))
+    print("corrected wrongs: {0}".format(float(wrong_correct) / (wrong_correct + wrong_wrong)))
 
+for val in [3,5, 10, 50, 100]:
+    print("comparables size {0}".format(val))
+    comparables = dp.labeled_dictionary(data, labels, val);
+    print("sequential up")
+    res = c.classify_sequential(test_data[0:10000], comparables, test_labels[0:10000], net_outputs[0:10000], 0.0 )
+    get_stats(res);
+    print("sequential down")
+    res = c.classify_sequential(test_data[0:10000], comparables, test_labels[0:10000], net_outputs[0:10000], 0.0, models.Autoencoder.DOWN)
+    get_stats(res);
+    print("sequential dichotomy")
+    res = c.classify_dichotomy_set(test_data[0:10000], net_outputs[0:10000], comparables, 0.0);
+    print("accuracy: {0}".format(res))
 

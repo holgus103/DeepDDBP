@@ -793,8 +793,8 @@ class Classifier(Model):
         correct = 0;
         total = len(test_samples);
         for s in range(0, total):
-            if(s % 1000 == 0):
-                print("Classified {0} samples".format(s));
+            #if(s % 1000 == 0):
+                #print("Classified {0} samples".format(s));
             v = self.classify_dichotomy(test_samples[s], d, margin, 0, 13, test_diffs[s]);
             if(v == test_diffs[s]):
                 correct += 1;
@@ -806,8 +806,8 @@ class Classifier(Model):
         wrong_wrong = 0;
         wrong_correct = 0;
         for i in range(0, len(samples)):
-            if(i % 1000 == 0):
-                print("Classified {0} samples".format(i));
+            #if(i % 1000 == 0):
+                #print("Classified {0} samples".format(i));
             if(direction == Autoencoder.UP):
                 ans = self.compare_sequential(samples[i], comparables, outputs[i], margin, is_debug, dbg);
             else:
@@ -850,18 +850,18 @@ class Classifier(Model):
             o = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: testing, self.output_placeholder: desired_outputs});
             if(is_debug):
                 tmp.append(o)
-            #for val in o:
-            #    if abs(val[0] - val[1]) < margin:
-            #        # this is a draw
-            #        dbg.append(tmp)
-            #        return i;
-            #    elif val[0] > val[1]:
-            #        left += 1;
-            #    else:
-            #        right += 1;
-            #if(left < right):
-            #    dbg.append(tmp)
-            #    return i;
+            for val in o:
+                if abs(val[0] - val[1]) < margin:
+                    # this is a draw
+                    dbg.append(tmp)
+                    return i;
+                elif val[0] > val[1]:
+                    left += 1;
+                else:
+                    right += 1;
+            if(left < right):
+                dbg.append(tmp)
+                return i;
         dbg.append(tmp)
         return 0;
 
