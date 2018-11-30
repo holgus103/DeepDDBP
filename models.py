@@ -920,18 +920,18 @@ class Classifier(Model):
             o = self.session.run(self.layer, feed_dict={self.input_placeholder_l: samples, self.input_placeholder_r: testing, self.output_placeholder: desired_outputs});
             if(is_debug):
                 tmp.append(o)
-            #for val in o:
-            #    if abs(val[0] - val[1]) < margin:
-            #        # this is a draw
-            #        dbg.append(tmp)
-            #        return i;
-            #    elif val[0] > val[1]:
-            #        left += 1;
-            #    else:
-            #        right += 1;
-            #if(left < right):
-            #    dbg.append(tmp)
-            #    return i;
+            for val in o:
+                if abs(val[0] - val[1]) < margin:
+                    # this is a draw
+                    dbg.append(tmp)
+                    return i;
+                elif val[0] > val[1]:
+                    left += 1;
+                else:
+                    right += 1;
+            if(left < right):
+                dbg.append(tmp)
+                return i;
         dbg.append(tmp)
         return 0;
 
