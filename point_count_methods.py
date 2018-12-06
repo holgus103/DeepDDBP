@@ -53,6 +53,36 @@ def assert_system(hand):
             bonus += 1; 
     return bonus;
 
+def three_and_four(hand, is_trump = True):
+    bonus = 0;
+    sums = [];
+    for i in range(0, 4):
+        sums.append(numpy.sum(hand[i]));
+    if is_trump:
+        val = 4
+    else:
+        val = 3
+    bonus += (sums[0] - val) > 0 and (sums[0] - val) or 0
+
+    for i in range(1, 4):
+            bonus += (sums[i] - 3) > 0 and (sums[i] - 3) or 0
+
+
+def plus_value(hand):
+    bonus = 0;
+    for i in range(0, 4):
+        bonus += hand[i][0] * 0.25;
+        ten_with_honors = numpy.sum(hand[i][0:4]) + hnad[i][5]
+        if ten_with_honors > 0:
+            bonus += 0.5;
+        if numpy.sum(hand[i][0:4]) >= 3 or numpy.sum(hand[i][0:3]) >= 2:
+            bonus += 0.5;
+    return bonus;
+
+
+
+
+
 
    
     
