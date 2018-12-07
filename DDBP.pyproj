@@ -23,6 +23,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="data_parser.py" />
+    <Compile Include="evaluation.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="parsing_tests.py" />
     <Compile Include="run\DDBP.py">
       <SubType>Code</SubType>
