@@ -86,20 +86,24 @@ def array_assert(arr1, arr2):
 
 def parseNoTrump():
     print("parseNoTrump:");
-    (data, outputs) = dp.parse(line, True, False);
+    (data_l, data_r, outputs, diffs) = dp.parse(line, True, False);
     p1 = p1_spades + p1_hearts + p1_diamonds + p1_clubs
     p2 = p2_spades + p2_hearts + p2_diamonds + p2_clubs
     p3 = p3_spades + p3_hearts + p3_diamonds + p3_clubs
     p4 = p4_spades + p4_hearts + p4_diamonds + p4_clubs
-    out = [nt_0, nt_2];
-    inputs = [p1 + p2 + p3 + p4, p3 + p4 + p1 + p2] 
+    out = [1, 1];
+    inputs_l = [p1 + p2 + p3 + p4, p3 + p4 + p1 + p2] 
+    inputs_r = [p4 + p1 + p2 + p3, p2 + p3 + p4 + p1]
     for i in range(0,2):
-        print(array_assert(data[i], inputs[i]))
-        print(array_assert([out[i]], [outputs[i]]))
+        print(array_assert(data_l[i], inputs_l[i]))
+        print(array_assert(data_r[i], inputs_r[i]))
+        print(array_assert(diffs, out))
+        print(array_assert(outputs[0], [1.0, 0.0]))
+        print(array_assert(outputs[1], [1.0, 0.0]))
 
 def parseColors():
     print("printColors:")
-    (data, outputs) = dp.parse(line, False, True);
+    (data_l, data_r, outputs, diffs) = dp.parse(line, False, True);
     p1 = [\
             p1_spades + p1_hearts + p1_diamonds + p1_clubs, \
             p1_hearts + p1_spades + p1_diamonds + p1_clubs, \
@@ -124,7 +128,22 @@ def parseColors():
             p4_diamonds + p4_hearts + p4_spades + p4_clubs, \
             p4_clubs + p4_hearts + p4_diamonds + p4_spades\
         ];    
-    hands = [\
+    hands_r = [\
+    # spades 
+                p4[0] + p1[0] + p2[0] + p3[0],\
+                p2[0] + p3[0] + p4[0] + p1[0],\
+
+    # hearts
+                p4[1] + p1[1] + p2[1] + p3[1],\
+                p2[1] + p3[1] + p4[1] + p1[1],\
+    # diamonds 
+                p4[2] + p1[2] + p2[2] + p3[2],\
+                p2[2] + p3[2] + p4[2] + p1[2],\
+    # clubs
+                p4[3] + p1[3] + p2[3] + p3[3],\
+                p2[3] + p3[3] + p4[3] + p1[3],\
+    ]     
+    hands_l = [\
     # spades 
                 p1[0] + p2[0] + p3[0] + p4[0],\
                 p3[0] + p4[0] + p1[0] + p2[0],\
@@ -138,11 +157,23 @@ def parseColors():
     # clubs
                 p1[3] + p2[3] + p3[3] + p4[3],\
                 p3[3] + p4[3] + p1[3] + p2[3],\
-    ]     
-    for i in range(0, len(data)):
-        print(array_assert(hands[i], data[i]));
+    ]
 
-print(testPlayerRotations());
+    out = [0, 0, 0, 0, 1, 1, 1, 1];
+    for i in range(0, len(data_l)):
+        print(array_assert(hands_l[i], data_l[i]));
+        print(array_assert(hands_r[i], data_r[i]));
+        print(array_assert(diffs, out))
+    print(array_assert(outputs[0], [0.5, 0.5]))
+    print(array_assert(outputs[1], [0.5, 0.5]))
+    print(array_assert(outputs[2], [0.5, 0.5]))
+    print(array_assert(outputs[3], [0.5, 0.5]))
+    print(array_assert(outputs[4], [1.0, 0.0]))
+    print(array_assert(outputs[5], [1.0, 0.0]))
+    print(array_assert(outputs[6], [1.0, 0.0]))
+    print(array_assert(outputs[7], [1.0, 0.0]))
+
+#print(testPlayerRotations());
 testParseHand();
 parseNoTrump();
 parseColors();

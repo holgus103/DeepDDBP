@@ -12,10 +12,20 @@ import pprint;
     The datasets were originally published here: https://github.com/dds-bridge/dds/tree/develop/hands
 
     Input format described:
-    TODO
+    The file library.gz is a gzipped ascii file.  In this file, each line refers to a deal.  Here is a typical one (the first, in fact):
+
+    JT852.93.KQ7.J82 AQ97.JT654.T6.A5 43.AK8.A542.7643 K6.Q72.J983.KQT9:88887777A9A977778888
+
+    There are 88 characters per line.  The first 16 give West's hand, with suits separated by periods.  Then there is a space.
+    The next 16 characters give North's hand, then East's, and then South's.  Then there is a colon, followed by 20 results (in hexadecimal).
+    The first four refer to NT: the number of tricks that can be taken by N/S with S leading, then E, then N, then W. 
+    The next four refer to S trumps, then H trumps, then D trumps, and finally C trumps.
 
 
 """
+
+
+
 
 def parse(input, no_trump, trump):
     """
@@ -53,8 +63,10 @@ def parse(input, no_trump, trump):
         'D' : 13, 
     }
     t = input.split(":");
-    data = [];
+    data_l = [];
+    data_r = [];
     outputs = [];
+    diffs = [];
     vals = t[0].split(" ");    
 
 
@@ -66,10 +78,13 @@ def parse(input, no_trump, trump):
             continue;
         else:
             c = t[1][i];
+            d = t[1][i+1];
             if c=="\n":
                 continue
-            arr = dict[c];
-            outputs.append(arr);
+            arr_l = dict[c];
+            arr_r = dict[d];
+            diffs.append(arr_l - arr_r);
+            outputs.append(arr_l > arr_r and [1.0, 0.0] or (arr_l < arr_r and [0.0, 1.0] or [0.5, 0.5]));
         # if c=="\n":
         #     continue
         # arr = dict[c] * 1.0 / 14.0 + 0.5/14.0
@@ -94,11 +109,10 @@ def parse(input, no_trump, trump):
             current = deals[(4-vist):(len(deals))] + deals[0:(4-vist)];
             #current = numpy.concatenate(deals);
 
-            data.append(numpy.concatenate(current));
+            data_l.append(numpy.concatenate(current));
+            data_r.append(numpy.concatenate(deals[(3-vist):(len(deals))] + deals[0:(3-vist)]))
             
-    return (data, outputs); 
-
-    
+    return (data_l, data_r, outputs, diffs)
 
 def process_player(cards):
     """
@@ -143,7 +157,7 @@ def process_player(cards):
         p.append(v);
     # suits: Spades, Hearts, Diamonds, Clubs
     # contracts: None, Spades, Hearts, Diamonds, Clubs
-    # east, north, west, south
+    # west, north, east, south
     return numpy.concatenate(tuple(p));
 
 def read_file(path, lines_count, shuffle = False, no_trump = True, trump = True, no_trump_test = True, trump_test = True, split = 0.66):
