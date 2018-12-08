@@ -183,16 +183,22 @@ def read_file(path, lines_count, shuffle = False, no_trump = True, trump = True,
         Tuple of lists containing a set of generated inputs and a set of corresponding outputs (training and test data)
 
     """
-    def process(data_set, outputs_set, line, no_trump, trump):
-        data, outputs = parse(line, no_trump, trump);
-        data_set.append(data)
+    def process(data_set_l, data_set_r, outputs_set, diffs_set,  line, no_trump, trump):
+        (data_l, data_r, outputs, diffs) = parse(line, no_trump, trump);
+        data_set_l.append(data_l)
+        data_set_r.append(data_r)
         outputs_set.append(outputs)
+        diffs_set.append(diffs)
 
     test_end = int(lines_count * split);
-    data_set = []
+    data_set_l = []
+    data_set_r = []
     outputs_set = []
-    test_set = []
+    diff_set = []
+    test_set_l = []
+    test_set_r = []
     test_outputs_set = []
+    test_diff_set = []
     line_number = 1
     lines = [];
     with open(path, "r") as file:
@@ -206,9 +212,9 @@ def read_file(path, lines_count, shuffle = False, no_trump = True, trump = True,
                 if line_number % 100  == 0:
                     print("Reading line {0}".format(line_number));
                 if line_number < test_end:
-                    process(data_set, outputs_set, line, no_trump, trump);
+                    process(data_set_l, data_set_r, outputs_set, diff_set,  line, no_trump, trump);
                 else:
-                    process(test_set, test_outputs_set, line, no_trump_test, trump_test);
+                    process(test_set_l, test_set_r, test_outputs_set, test_diff_set, line, no_trump_test, trump_test);
             #data_set = data_set + data;
             #outputs_set = outputs_set + outputs;
             line_number = line_number + 1
@@ -219,11 +225,14 @@ def read_file(path, lines_count, shuffle = False, no_trump = True, trump = True,
             if line_number % 100  == 0:
                 print("Reading line {0}".format(line_number));
             if line_number < test_end:
-                process(data_set, outputs_set, line, no_trump, trump);
+                process(data_set_l, data_set_r, outputs_set, diff_set,  line, no_trump, trump);
             else:
-                process(test_set, test_outputs_set, line, no_trump_test, trump_test);
+                process(test_set_l, test_set_r, test_outputs_set, test_diff_set, line, no_trump_test, trump_test);
             line_number = line_number + 1;
-    return combine_data_sets(data_set, outputs_set) + combine_data_sets(test_set, test_outputs_set);
+    return (flatmap(data_set_l), flatmap(data_set_r), flatmap(outputs_set), flatmap(diff_set), flatmap(test_set_l), flatmap(test_set_r), flatmap(test_outputs_set), flatmap(test_diff_set))
+
+def flatmap(set):
+    return [x for y in set for x in y];
 
 def combine_data_sets(data_sets, output_sets):
     """
